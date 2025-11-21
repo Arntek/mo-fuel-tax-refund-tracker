@@ -20,7 +20,7 @@ type Member = any;
 
 export default function Dashboard() {
   const params = useParams();
-  const accountId = parseInt(params.accountId || "0");
+  const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
 
@@ -115,7 +115,7 @@ export default function Dashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   {vehicles.map((vehicle: Vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id.toString()}>
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
                       {vehicle.year} {vehicle.make} {vehicle.model}
                     </SelectItem>
                   ))}
@@ -156,7 +156,7 @@ export default function Dashboard() {
           )}
 
           {vehicles.length > 0 && selectedVehicleId && (
-            <UploadZone accountId={accountId} vehicleId={parseInt(selectedVehicleId)} />
+            <UploadZone accountId={accountId} vehicleId={selectedVehicleId} />
           )}
         </div>
 

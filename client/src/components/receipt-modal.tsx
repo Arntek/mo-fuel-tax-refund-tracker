@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 
 interface ReceiptModalProps {
   receipt: Receipt;
-  accountId: number;
+  accountId: string;
   open: boolean;
   onClose: () => void;
 }

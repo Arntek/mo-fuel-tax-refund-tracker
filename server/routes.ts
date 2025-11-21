@@ -33,7 +33,7 @@ async function authMiddleware(req: any, res: any, next: any) {
 }
 
 async function accountAccessMiddleware(req: any, res: any, next: any) {
-  const accountId = parseInt(req.params.accountId || req.body.accountId);
+  const accountId = req.params.accountId || req.body.accountId;
   
   if (!accountId) {
     return res.status(400).json({ error: "Account ID required" });
@@ -304,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/accounts/:accountId/members/:userId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
-      const userId = parseInt(req.params.userId);
+      const userId = req.params.userId;
       const { role } = req.body;
       
       if (!role) {
@@ -326,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/accounts/:accountId/members/:userId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
-      const userId = parseInt(req.params.userId);
+      const userId = req.params.userId;
       const account = await storage.getAccountById(req.accountId);
       
       if (account?.ownerId === userId) {
@@ -373,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/accounts/:accountId/vehicles/:id", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       const validated = insertVehicleSchema.partial().parse(req.body);
       
       const updated = await storage.updateVehicle(id, validated);
@@ -391,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/accounts/:accountId/vehicles/:id", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       const deleted = await storage.deleteVehicle(id);
       
       if (!deleted) {
@@ -482,7 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const receiptData = {
         accountId: req.accountId,
-        vehicleId: vehicleId ? parseInt(vehicleId) : null,
+        vehicleId: vehicleId || null,
         uploadedBy: req.userId,
         imageUrl: fullImageUrl,
         date: transcription.date,

@@ -21,7 +21,7 @@ import {
 
 interface ReceiptTableProps {
   receipts: Receipt[];
-  accountId: number;
+  accountId: string;
 }
 
 type SortField = "date" | "stationName" | "gallons" | "totalAmount";

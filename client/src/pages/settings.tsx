@@ -13,7 +13,7 @@ import type { Account } from "@shared/schema";
 
 export default function Settings() {
   const params = useParams();
-  const accountId = parseInt(params.accountId || "0");
+  const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 

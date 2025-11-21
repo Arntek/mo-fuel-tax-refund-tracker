@@ -8,14 +8,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type Account = {
-  id: number;
+  id: string;
   name: string;
   type: string;
 };
 
 interface AccountHeaderProps {
   account: Account | undefined;
-  accountId: number;
+  accountId: string;
 }
 
 export function AccountHeader({ account, accountId }: AccountHeaderProps) {

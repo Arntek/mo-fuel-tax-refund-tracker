@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, numeric, timestamp, serial, integer, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, numeric, timestamp, serial, integer, boolean, index, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   firstName: varchar("first_name", { length: 255 }).notNull(),
   lastName: varchar("last_name", { length: 255 }).notNull(),
@@ -15,7 +15,7 @@ export const users = pgTable("users", {
 
 export const sessions = pgTable("sessions", {
   id: varchar("id", { length: 255 }).primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
@@ -24,7 +24,7 @@ export const sessions = pgTable("sessions", {
 }));
 
 export const authCodes = pgTable("auth_codes", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull(),
   code: varchar("code", { length: 6 }).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
@@ -35,10 +35,10 @@ export const authCodes = pgTable("auth_codes", {
 }));
 
 export const accounts = pgTable("accounts", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 50 }).notNull().default("family"),
-  ownerId: integer("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   businessName: varchar("business_name", { length: 255 }),
   fein: varchar("fein", { length: 20 }),
   firstName: varchar("first_name", { length: 255 }),
@@ -60,9 +60,9 @@ export const accounts = pgTable("accounts", {
 });
 
 export const accountMembers = pgTable("account_members", {
-  id: serial("id").primaryKey(),
-  accountId: integer("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: varchar("role", { length: 50 }).notNull().default("member"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
@@ -70,8 +70,8 @@ export const accountMembers = pgTable("account_members", {
 }));
 
 export const vehicles = pgTable("vehicles", {
-  id: serial("id").primaryKey(),
-  accountId: integer("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
   vin: varchar("vin", { length: 17 }),
   year: integer("year").notNull(),
   make: varchar("make", { length: 100 }).notNull(),
@@ -84,10 +84,10 @@ export const vehicles = pgTable("vehicles", {
 }));
 
 export const receipts = pgTable("receipts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  accountId: integer("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
-  vehicleId: integer("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
-  uploadedBy: integer("uploaded_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  vehicleId: uuid("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
+  uploadedBy: uuid("uploaded_by").notNull().references(() => users.id, { onDelete: "cascade" }),
   imageUrl: text("image_url").notNull(),
   date: text("date").notNull(),
   stationName: text("station_name").notNull(),

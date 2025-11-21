@@ -15,7 +15,7 @@ type Vehicle = any;
 
 export default function Vehicles() {
   const params = useParams();
-  const accountId = parseInt(params.accountId || "0");
+  const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);

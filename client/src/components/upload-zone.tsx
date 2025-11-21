@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Camera, Upload, Loader2 } from "lucide-react";
 
 type UploadZoneProps = {
-  accountId: number;
-  vehicleId: number;
+  accountId: string;
+  vehicleId: string;
 };
 
 export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
@@ -23,7 +23,7 @@ export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("receipt", file);
-      formData.append("vehicleId", vehicleId.toString());
+      formData.append("vehicleId", vehicleId);
       
       const response = await fetch(`/api/accounts/${accountId}/receipts/upload`, {
         method: "POST",

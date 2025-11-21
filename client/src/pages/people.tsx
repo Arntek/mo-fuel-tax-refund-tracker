@@ -15,7 +15,7 @@ type Member = any;
 
 export default function People() {
   const params = useParams();
-  const accountId = parseInt(params.accountId || "0");
+  const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
