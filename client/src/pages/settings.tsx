@@ -11,6 +11,26 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Account } from "@shared/schema";
 
+// Helper functions for obfuscation
+function obfuscateSSN(ssn: string): string {
+  if (!ssn) return "";
+  const clean = ssn.replace(/\D/g, "");
+  if (clean.length < 4) return ssn;
+  return "•••-••-" + clean.slice(-4);
+}
+
+function obfuscateEIN(ein: string): string {
+  if (!ein) return "";
+  const clean = ein.replace(/\D/g, "");
+  if (clean.length < 4) return ein;
+  return "••-" + clean.slice(-4);
+}
+
+function deobfuscate(value: string): string {
+  if (!value || !value.includes("•")) return value;
+  return "";
+}
+
 export default function Settings() {
   const params = useParams();
   const accountId = params.accountId || "";
@@ -40,7 +60,12 @@ export default function Settings() {
     zipCode: "",
     emailAddress: "",
     phoneNumber: "",
-    faxNumber: "",
+  });
+
+  const [displayValues, setDisplayValues] = useState({
+    ssn: "",
+    fein: "",
+    spouseSsn: "",
   });
 
   // Sync account data when it loads
@@ -65,7 +90,11 @@ export default function Settings() {
         zipCode: account.zipCode || "",
         emailAddress: account.emailAddress || "",
         phoneNumber: account.phoneNumber || "",
-        faxNumber: account.faxNumber || "",
+      });
+      setDisplayValues({
+        ssn: obfuscateSSN(account.ssn || ""),
+        fein: obfuscateEIN(account.fein || ""),
+        spouseSsn: obfuscateSSN(account.spouseSsn || ""),
       });
     }
   }, [account]);
@@ -95,6 +124,15 @@ export default function Settings() {
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Update display values for sensitive fields
+    if (field === "ssn") {
+      setDisplayValues(prev => ({ ...prev, ssn: obfuscateSSN(value) }));
+    } else if (field === "fein") {
+      setDisplayValues(prev => ({ ...prev, fein: obfuscateEIN(value) }));
+    } else if (field === "spouseSsn") {
+      setDisplayValues(prev => ({ ...prev, spouseSsn: obfuscateSSN(value) }));
+    }
   };
 
 
@@ -186,183 +224,208 @@ export default function Settings() {
             </div>
 
             <div className="border-t pt-4 mt-4">
-              <h3 className="font-semibold mb-3">Tax Form Information (Form 4923-H)</h3>
+              <h3 className="font-semibold mb-4">Tax Form Information (Form 4923-H)</h3>
               
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="business-name">Business Name</Label>
-                  <Input
-                    id="business-name"
-                    value={formData.businessName}
-                    onChange={(e) => handleChange("businessName", e.target.value)}
-                    data-testid="input-business-name"
-                  />
-                </div>
+              <div className="space-y-6">
+                {/* Claimant Section */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground">Claimant</h4>
+                  
+                  {/* Business - only for business accounts */}
+                  {formData.type === "business" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="business-name">Business Name <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="business-name"
+                          value={formData.businessName}
+                          onChange={(e) => handleChange("businessName", e.target.value)}
+                          data-testid="input-business-name"
+                        />
+                      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="fein">FEIN</Label>
-                  <Input
-                    id="fein"
-                    value={formData.fein}
-                    onChange={(e) => handleChange("fein", e.target.value)}
-                    placeholder="XX-XXXXXXX"
-                    data-testid="input-fein"
-                  />
-                </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fein">EIN <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="fein"
+                          value={formData.fein}
+                          onChange={(e) => handleChange("fein", e.target.value)}
+                          placeholder="••-XXXX"
+                          maxLength={9}
+                          data-testid="input-fein"
+                        />
+                        {formData.fein && displayValues.fein && (
+                          <p className="text-xs text-muted-foreground">{displayValues.fein}</p>
+                        )}
+                      </div>
+                    </>
+                  )}
 
-                <div className="grid grid-cols-6 gap-2">
-                  <div className="col-span-3 space-y-2">
-                    <Label htmlFor="first-name">First Name</Label>
-                    <Input
-                      id="first-name"
-                      value={formData.firstName}
-                      onChange={(e) => handleChange("firstName", e.target.value)}
-                      data-testid="input-first-name"
-                    />
-                  </div>
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="mi">MI</Label>
-                    <Input
-                      id="mi"
-                      value={formData.middleInitial}
-                      onChange={(e) => handleChange("middleInitial", e.target.value)}
-                      maxLength={2}
-                      data-testid="input-middle-initial"
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="last-name">Last Name</Label>
-                    <Input
-                      id="last-name"
-                      value={formData.lastName}
-                      onChange={(e) => handleChange("lastName", e.target.value)}
-                      data-testid="input-last-name"
-                    />
-                  </div>
-                </div>
+                  {/* Person - always required */}
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Person <span className="text-destructive">*</span></p>
+                    <div className="grid grid-cols-6 gap-2 mb-4">
+                      <div className="col-span-3 space-y-2">
+                        <Label htmlFor="first-name">First Name</Label>
+                        <Input
+                          id="first-name"
+                          value={formData.firstName}
+                          onChange={(e) => handleChange("firstName", e.target.value)}
+                          data-testid="input-first-name"
+                        />
+                      </div>
+                      <div className="col-span-1 space-y-2">
+                        <Label htmlFor="mi">MI</Label>
+                        <Input
+                          id="mi"
+                          value={formData.middleInitial}
+                          onChange={(e) => handleChange("middleInitial", e.target.value)}
+                          maxLength={2}
+                          data-testid="input-middle-initial"
+                        />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <Label htmlFor="last-name">Last Name</Label>
+                        <Input
+                          id="last-name"
+                          value={formData.lastName}
+                          onChange={(e) => handleChange("lastName", e.target.value)}
+                          data-testid="input-last-name"
+                        />
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="ssn">Social Security Number</Label>
-                  <Input
-                    id="ssn"
-                    value={formData.ssn}
-                    onChange={(e) => handleChange("ssn", e.target.value)}
-                    placeholder="XXX-XX-XXXX"
-                    data-testid="input-ssn"
-                  />
-                </div>
-
-                <div className="grid grid-cols-6 gap-2">
-                  <div className="col-span-3 space-y-2">
-                    <Label htmlFor="spouse-first-name">Spouse's First Name</Label>
-                    <Input
-                      id="spouse-first-name"
-                      value={formData.spouseFirstName}
-                      onChange={(e) => handleChange("spouseFirstName", e.target.value)}
-                      data-testid="input-spouse-first-name"
-                    />
-                  </div>
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="spouse-mi">MI</Label>
-                    <Input
-                      id="spouse-mi"
-                      value={formData.spouseMiddleInitial}
-                      onChange={(e) => handleChange("spouseMiddleInitial", e.target.value)}
-                      maxLength={2}
-                      data-testid="input-spouse-middle-initial"
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="spouse-last-name">Spouse's Last Name</Label>
-                    <Input
-                      id="spouse-last-name"
-                      value={formData.spouseLastName}
-                      onChange={(e) => handleChange("spouseLastName", e.target.value)}
-                      data-testid="input-spouse-last-name"
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="ssn">Social Security Number</Label>
+                      <Input
+                        id="ssn"
+                        value={formData.ssn}
+                        onChange={(e) => handleChange("ssn", e.target.value)}
+                        placeholder="•••-••-XXXX"
+                        maxLength={11}
+                        data-testid="input-ssn"
+                      />
+                      {formData.ssn && displayValues.ssn && (
+                        <p className="text-xs text-muted-foreground">{displayValues.ssn}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="spouse-ssn">Spouse's Social Security Number</Label>
-                  <Input
-                    id="spouse-ssn"
-                    value={formData.spouseSsn}
-                    onChange={(e) => handleChange("spouseSsn", e.target.value)}
-                    placeholder="XXX-XX-XXXX"
-                    data-testid="input-spouse-ssn"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="mailing-address">Mailing Address</Label>
-                  <Input
-                    id="mailing-address"
-                    value={formData.mailingAddress}
-                    onChange={(e) => handleChange("mailingAddress", e.target.value)}
-                    data-testid="input-mailing-address"
-                  />
-                </div>
-
-                <div className="grid grid-cols-6 gap-2">
-                  <div className="col-span-3 space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={formData.city}
-                      onChange={(e) => handleChange("city", e.target.value)}
-                      data-testid="input-city"
-                    />
+                {/* Spouse Section - Optional */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground">Spouse</h4>
+                  
+                  <div className="grid grid-cols-6 gap-2">
+                    <div className="col-span-3 space-y-2">
+                      <Label htmlFor="spouse-first-name">First Name</Label>
+                      <Input
+                        id="spouse-first-name"
+                        value={formData.spouseFirstName}
+                        onChange={(e) => handleChange("spouseFirstName", e.target.value)}
+                        data-testid="input-spouse-first-name"
+                      />
+                    </div>
+                    <div className="col-span-1 space-y-2">
+                      <Label htmlFor="spouse-mi">MI</Label>
+                      <Input
+                        id="spouse-mi"
+                        value={formData.spouseMiddleInitial}
+                        onChange={(e) => handleChange("spouseMiddleInitial", e.target.value)}
+                        maxLength={2}
+                        data-testid="input-spouse-middle-initial"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="spouse-last-name">Last Name</Label>
+                      <Input
+                        id="spouse-last-name"
+                        value={formData.spouseLastName}
+                        onChange={(e) => handleChange("spouseLastName", e.target.value)}
+                        data-testid="input-spouse-last-name"
+                      />
+                    </div>
                   </div>
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                      id="state"
-                      value={formData.state}
-                      onChange={(e) => handleChange("state", e.target.value)}
-                      maxLength={2}
-                      data-testid="input-state"
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <Label htmlFor="zip-code">ZIP Code</Label>
-                    <Input
-                      id="zip-code"
-                      value={formData.zipCode}
-                      onChange={(e) => handleChange("zipCode", e.target.value)}
-                      data-testid="input-zip-code"
-                    />
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email-address">Email Address</Label>
-                  <Input
-                    id="email-address"
-                    type="email"
-                    value={formData.emailAddress}
-                    onChange={(e) => handleChange("emailAddress", e.target.value)}
-                    data-testid="input-email-address"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-2">
-                    <Label htmlFor="phone-number">Phone Number</Label>
+                    <Label htmlFor="spouse-ssn">Social Security Number</Label>
+                    <Input
+                      id="spouse-ssn"
+                      value={formData.spouseSsn}
+                      onChange={(e) => handleChange("spouseSsn", e.target.value)}
+                      placeholder="•••-••-XXXX"
+                      maxLength={11}
+                      data-testid="input-spouse-ssn"
+                    />
+                    {formData.spouseSsn && displayValues.spouseSsn && (
+                      <p className="text-xs text-muted-foreground">{displayValues.spouseSsn}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contact Section - Required */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground">Contact <span className="text-destructive">*</span></h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="mailing-address">Address</Label>
+                    <Input
+                      id="mailing-address"
+                      value={formData.mailingAddress}
+                      onChange={(e) => handleChange("mailingAddress", e.target.value)}
+                      data-testid="input-mailing-address"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-6 gap-2">
+                    <div className="col-span-3 space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => handleChange("city", e.target.value)}
+                        data-testid="input-city"
+                      />
+                    </div>
+                    <div className="col-span-1 space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        value={formData.state}
+                        onChange={(e) => handleChange("state", e.target.value)}
+                        maxLength={2}
+                        data-testid="input-state"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label htmlFor="zip-code">ZIP Code</Label>
+                      <Input
+                        id="zip-code"
+                        value={formData.zipCode}
+                        onChange={(e) => handleChange("zipCode", e.target.value)}
+                        data-testid="input-zip-code"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email-address">Email</Label>
+                    <Input
+                      id="email-address"
+                      type="email"
+                      value={formData.emailAddress}
+                      onChange={(e) => handleChange("emailAddress", e.target.value)}
+                      data-testid="input-email-address"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone-number">Phone</Label>
                     <Input
                       id="phone-number"
                       value={formData.phoneNumber}
                       onChange={(e) => handleChange("phoneNumber", e.target.value)}
                       data-testid="input-phone-number"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fax-number">Fax Number</Label>
-                    <Input
-                      id="fax-number"
-                      value={formData.faxNumber}
-                      onChange={(e) => handleChange("faxNumber", e.target.value)}
-                      data-testid="input-fax-number"
                     />
                   </div>
                 </div>
