@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UploadZone } from "@/components/upload-zone";
 import { ReceiptTable } from "@/components/receipt-table";
 import { DashboardSummary } from "@/components/dashboard-summary";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Car } from "lucide-react";
+import { Car, Check } from "lucide-react";
 
 type Receipt = any;
 type Account = any;
@@ -38,6 +38,22 @@ export default function Dashboard() {
     queryKey: ["/api/accounts", accountId, "vehicles"],
     enabled: !!accountId,
   });
+
+  // Load last selected vehicle from localStorage
+  useEffect(() => {
+    if (vehicles.length > 0 && !selectedVehicleId) {
+      const lastVehicleId = localStorage.getItem(`lastVehicle_${accountId}`);
+      if (lastVehicleId && vehicles.some((v: Vehicle) => v.id === lastVehicleId)) {
+        setSelectedVehicleId(lastVehicleId);
+      }
+    }
+  }, [vehicles, accountId, selectedVehicleId]);
+
+  // Save selected vehicle to localStorage
+  const handleVehicleChange = (vehicleId: string) => {
+    setSelectedVehicleId(vehicleId);
+    localStorage.setItem(`lastVehicle_${accountId}`, vehicleId);
+  };
 
   const getCurrentFiscalYear = () => {
     const now = new Date();
@@ -106,24 +122,6 @@ export default function Dashboard() {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Upload Receipt</h2>
           
-          {vehicles.length > 0 && (
-            <div className="max-w-md">
-              <Label htmlFor="vehicle-select">Select Vehicle</Label>
-              <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
-                <SelectTrigger id="vehicle-select" data-testid="select-vehicle">
-                  <SelectValue placeholder="Choose a vehicle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehicles.map((vehicle: Vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {vehicle.year} {vehicle.make} {vehicle.model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           {vehicles.length === 0 && (
             <Card className="border-destructive/50">
               <CardHeader>
@@ -132,7 +130,7 @@ export default function Dashboard() {
                   No Vehicles Added
                 </CardTitle>
                 <CardDescription>
-                  Add at least one vehicle in settings before uploading receipts.
+                  Add at least one vehicle before uploading receipts.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -145,18 +143,77 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {vehicles.length > 0 && !selectedVehicleId && (
-            <Card className="border-accent">
-              <CardHeader>
-                <CardDescription>
-                  Please select a vehicle before uploading a receipt.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          )}
+          {vehicles.length > 0 && (
+            <>
+              {/* Step 1: Select Vehicle */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+                      1
+                    </span>
+                    Select Vehicle
+                  </CardTitle>
+                  <CardDescription>
+                    Choose which vehicle this receipt is for
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Select value={selectedVehicleId} onValueChange={handleVehicleChange}>
+                    <SelectTrigger id="vehicle-select" data-testid="select-vehicle" className="max-w-md">
+                      <SelectValue placeholder="Choose a vehicle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicles.map((vehicle: Vehicle) => (
+                        <SelectItem key={vehicle.id} value={vehicle.id}>
+                          {vehicle.year} {vehicle.make} {vehicle.model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedVehicleId && (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="w-4 h-4 text-green-600" />
+                      Vehicle selected
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-          {vehicles.length > 0 && selectedVehicleId && (
-            <UploadZone accountId={accountId} vehicleId={selectedVehicleId} />
+              {/* Step 2: Upload Receipt */}
+              {selectedVehicleId ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+                        2
+                      </span>
+                      Upload Receipt
+                    </CardTitle>
+                    <CardDescription>
+                      Take a photo or upload an image of your gas receipt
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <UploadZone accountId={accountId} vehicleId={selectedVehicleId} />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-muted-foreground/20">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2 text-muted-foreground">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-sm font-semibold">
+                        2
+                      </span>
+                      Upload Receipt
+                    </CardTitle>
+                    <CardDescription>
+                      Select a vehicle first to enable upload
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              )}
+            </>
           )}
         </div>
 

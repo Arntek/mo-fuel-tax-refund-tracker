@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Loader2 } from "lucide-react";
 
@@ -109,9 +108,9 @@ export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
   };
 
   return (
-    <Card
-      className={`p-6 md:p-8 transition-all ${
-        isDragging ? "border-primary bg-accent" : ""
+    <div
+      className={`p-6 md:p-8 rounded-md border-2 border-dashed transition-all ${
+        isDragging ? "border-primary bg-accent" : "border-muted-foreground/25"
       } ${isProcessing ? "opacity-60 pointer-events-none" : ""}`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -183,6 +182,6 @@ export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
         className="hidden"
         data-testid="input-camera"
       />
-    </Card>
+    </div>
   );
 }
