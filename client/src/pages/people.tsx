@@ -2,10 +2,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, LogOut, Users, Car, Settings, ChevronDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AccountHeader } from "@/components/account-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +21,7 @@ export default function People() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
 
-  const { data: account, isLoading: accountLoading } = useQuery<Account>({
+  const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
   });
@@ -31,27 +31,6 @@ export default function People() {
     enabled: !!accountId,
   });
 
-  const handleLogout = async () => {
-    try {
-      await apiRequest("/api/auth/logout", { method: "POST" });
-      toast({
-        title: "Logged out",
-        description: "You have been logged out successfully",
-      });
-      setLocation("/");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to logout",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSwitchAccount = () => {
-    localStorage.removeItem("selectedAccountId");
-    setLocation("/accounts");
-  };
 
   const addMemberMutation = useMutation({
     mutationFn: async () => {
@@ -119,52 +98,34 @@ export default function People() {
     );
   }
 
+  if (accountError || !account) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <AccountHeader account={account} accountId={accountId} />
+        <main className="flex-1 flex items-center justify-center">
+          <Card className="max-w-md w-full mx-4">
+            <CardHeader>
+              <CardTitle>Account Not Found</CardTitle>
+              <CardDescription>
+                This account could not be loaded. Please try switching to a different account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full" data-testid="button-switch-account-error">
+                <Link href="/accounts">
+                  Switch Account
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 bg-background z-50">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-          <button 
-            onClick={handleSwitchAccount}
-            className="text-left hover-elevate active-elevate-2 rounded-md px-2 py-1 flex items-center gap-1"
-            data-testid="button-account-name"
-          >
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold">{account?.name || "Receipt Tracker"}</h1>
-              <p className="text-xs text-muted-foreground">
-                {account?.type === "family" ? "Family" : "Business"} Account
-              </p>
-            </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Link href={`/dashboard/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-dashboard">
-              <Receipt className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/people/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-people">
-              <Users className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/vehicles/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-vehicles">
-              <Car className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/settings/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-settings">
-              <Settings className="w-4 h-4" />
-            </Button>
-          </Link>
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
-      </header>
+      <AccountHeader account={account} accountId={accountId} />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full space-y-6">
         <div className="flex items-center gap-2">

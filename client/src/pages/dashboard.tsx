@@ -1,19 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, Settings, LogOut, Users, Car, ChevronDown } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { UploadZone } from "@/components/upload-zone";
 import { ReceiptTable } from "@/components/receipt-table";
 import { DashboardSummary } from "@/components/dashboard-summary";
 import { ExportSection } from "@/components/export-section";
 import { DeadlineBanner } from "@/components/deadline-banner";
-import { Card, CardDescription, CardHeader } from "@/components/ui/card";
+import { AccountHeader } from "@/components/account-header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Car } from "lucide-react";
 
 type Receipt = any;
 type Account = any;
@@ -24,10 +22,9 @@ export default function Dashboard() {
   const params = useParams();
   const accountId = parseInt(params.accountId || "0");
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
 
-  const { data: account, isLoading: accountLoading } = useQuery<Account>({
+  const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
   });
@@ -41,28 +38,6 @@ export default function Dashboard() {
     queryKey: ["/api/accounts", accountId, "vehicles"],
     enabled: !!accountId,
   });
-
-  const handleLogout = async () => {
-    try {
-      await apiRequest("/api/auth/logout", { method: "POST" });
-      toast({
-        title: "Logged out",
-        description: "You have been logged out successfully",
-      });
-      setLocation("/");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to logout",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSwitchAccount = () => {
-    localStorage.removeItem("selectedAccountId");
-    setLocation("/accounts");
-  };
 
   const getCurrentFiscalYear = () => {
     const now = new Date();
@@ -96,47 +71,34 @@ export default function Dashboard() {
     );
   }
 
+  if (accountError || !account) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <AccountHeader account={account} accountId={accountId} />
+        <main className="flex-1 flex items-center justify-center">
+          <Card className="max-w-md w-full mx-4">
+            <CardHeader>
+              <CardTitle>Account Not Found</CardTitle>
+              <CardDescription>
+                This account could not be loaded. Please try switching to a different account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full" data-testid="button-switch-account-error">
+                <Link href="/accounts">
+                  Switch Account
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 bg-background z-50">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-          <button 
-            onClick={handleSwitchAccount}
-            className="text-left hover-elevate active-elevate-2 rounded-md px-2 py-1 flex items-center gap-1"
-            data-testid="button-account-name"
-          >
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold">{account?.name || "Receipt Tracker"}</h1>
-              <p className="text-xs text-muted-foreground">
-                {account?.type === "family" ? "Family" : "Business"} Account
-              </p>
-            </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Link href={`/people/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-people">
-              <Users className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/vehicles/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-vehicles">
-              <Car className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/settings/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-settings">
-              <Settings className="w-4 h-4" />
-            </Button>
-          </Link>
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
-      </header>
+      <AccountHeader account={account} accountId={accountId} />
 
       <DeadlineBanner />
 

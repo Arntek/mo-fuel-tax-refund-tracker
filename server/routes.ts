@@ -271,10 +271,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email required" });
       }
       
-      const user = await storage.getUserByEmail(email);
+      let user = await storage.getUserByEmail(email);
       
       if (!user) {
-        return res.status(404).json({ error: "User not found. They must create an account first." });
+        // Auto-create user if they don't exist
+        const emailParts = email.split('@')[0];
+        user = await storage.createUser({
+          email,
+          firstName: emailParts,
+          lastName: "",
+        });
       }
       
       const existingMember = await storage.isUserAccountMember(req.accountId, user.id);

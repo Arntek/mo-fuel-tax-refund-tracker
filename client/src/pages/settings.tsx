@@ -1,71 +1,74 @@
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { ChevronLeft, LogOut, Receipt, Car, Users, ChevronDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AccountHeader } from "@/components/account-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Account } from "@shared/schema";
 
 export default function Settings() {
-  const { accountId } = useParams();
+  const params = useParams();
+  const accountId = parseInt(params.accountId || "0");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { data: account, isLoading: accountLoading } = useQuery<Account>({
-    queryKey: ["/api/accounts", parseInt(accountId!)],
+  const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
+    queryKey: ["/api/accounts", accountId],
   });
 
   const [formData, setFormData] = useState({
-    name: account?.name || "",
-    type: account?.type || "family",
-    businessName: account?.businessName || "",
-    fein: account?.fein || "",
-    firstName: account?.firstName || "",
-    middleInitial: account?.middleInitial || "",
-    lastName: account?.lastName || "",
-    ssn: account?.ssn || "",
-    spouseFirstName: account?.spouseFirstName || "",
-    spouseMiddleInitial: account?.spouseMiddleInitial || "",
-    spouseLastName: account?.spouseLastName || "",
-    spouseSsn: account?.spouseSsn || "",
-    mailingAddress: account?.mailingAddress || "",
-    city: account?.city || "",
-    state: account?.state || "",
-    zipCode: account?.zipCode || "",
-    emailAddress: account?.emailAddress || "",
-    phoneNumber: account?.phoneNumber || "",
-    faxNumber: account?.faxNumber || "",
+    name: "",
+    type: "family" as "family" | "business",
+    businessName: "",
+    fein: "",
+    firstName: "",
+    middleInitial: "",
+    lastName: "",
+    ssn: "",
+    spouseFirstName: "",
+    spouseMiddleInitial: "",
+    spouseLastName: "",
+    spouseSsn: "",
+    mailingAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    emailAddress: "",
+    phoneNumber: "",
+    faxNumber: "",
   });
 
   // Sync account data when it loads
-  if (account && formData.name === "") {
-    setFormData({
-      name: account.name || "",
-      type: account.type || "family",
-      businessName: account.businessName || "",
-      fein: account.fein || "",
-      firstName: account.firstName || "",
-      middleInitial: account.middleInitial || "",
-      lastName: account.lastName || "",
-      ssn: account.ssn || "",
-      spouseFirstName: account.spouseFirstName || "",
-      spouseMiddleInitial: account.spouseMiddleInitial || "",
-      spouseLastName: account.spouseLastName || "",
-      spouseSsn: account.spouseSsn || "",
-      mailingAddress: account.mailingAddress || "",
-      city: account.city || "",
-      state: account.state || "",
-      zipCode: account.zipCode || "",
-      emailAddress: account.emailAddress || "",
-      phoneNumber: account.phoneNumber || "",
-      faxNumber: account.faxNumber || "",
-    });
-  }
+  useEffect(() => {
+    if (account) {
+      setFormData({
+        name: account.name || "",
+        type: (account.type as "family" | "business") || "family",
+        businessName: account.businessName || "",
+        fein: account.fein || "",
+        firstName: account.firstName || "",
+        middleInitial: account.middleInitial || "",
+        lastName: account.lastName || "",
+        ssn: account.ssn || "",
+        spouseFirstName: account.spouseFirstName || "",
+        spouseMiddleInitial: account.spouseMiddleInitial || "",
+        spouseLastName: account.spouseLastName || "",
+        spouseSsn: account.spouseSsn || "",
+        mailingAddress: account.mailingAddress || "",
+        city: account.city || "",
+        state: account.state || "",
+        zipCode: account.zipCode || "",
+        emailAddress: account.emailAddress || "",
+        phoneNumber: account.phoneNumber || "",
+        faxNumber: account.faxNumber || "",
+      });
+    }
+  }, [account]);
 
   const updateAccountMutation = useMutation({
     mutationFn: async () => {
@@ -75,7 +78,7 @@ export default function Settings() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", parseInt(accountId!)] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId] });
       toast({
         title: "Account updated",
         description: "Your account details have been updated",
@@ -94,15 +97,6 @@ export default function Settings() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleLogout = async () => {
-    await apiRequest("/api/auth/logout", { method: "POST" });
-    queryClient.clear();
-    setLocation("/");
-  };
-
-  const handleSwitchAccount = () => {
-    setLocation("/accounts");
-  };
 
   if (!accountId) {
     setLocation("/accounts");
@@ -120,47 +114,34 @@ export default function Settings() {
     );
   }
 
+  if (accountError || !account) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <AccountHeader account={account} accountId={accountId} />
+        <main className="flex-1 flex items-center justify-center">
+          <Card className="max-w-md w-full mx-4">
+            <CardHeader>
+              <CardTitle>Account Not Found</CardTitle>
+              <CardDescription>
+                This account could not be loaded. Please try switching to a different account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full" data-testid="button-switch-account-error">
+                <Link href="/accounts">
+                  Switch Account
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 bg-background z-50">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-          <button 
-            onClick={handleSwitchAccount}
-            className="text-left hover-elevate active-elevate-2 rounded-md px-2 py-1 flex items-center gap-1"
-            data-testid="button-account-name"
-          >
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold">{account?.name || "Receipt Tracker"}</h1>
-              <p className="text-xs text-muted-foreground">
-                {account?.type === "family" ? "Family" : "Business"} Account
-              </p>
-            </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Link href={`/dashboard/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-dashboard">
-              <Receipt className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/people/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-people">
-              <Users className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/vehicles/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-vehicles">
-              <Car className="w-4 h-4" />
-            </Button>
-          </Link>
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
-      </header>
+      <AccountHeader account={account} accountId={accountId} />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full">
         <div className="mb-6">
