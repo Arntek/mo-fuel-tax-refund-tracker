@@ -28,7 +28,7 @@ const db = drizzle(pool, { schema });
 export interface IStorage {
   // User operations
   getUserByEmail(email: string): Promise<User | undefined>;
-  getUserById(id: number): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Session operations
@@ -40,33 +40,33 @@ export interface IStorage {
   // Auth code operations
   createAuthCode(authCode: InsertAuthCode): Promise<AuthCode>;
   getAuthCodeByEmailAndCode(email: string, code: string): Promise<AuthCode | undefined>;
-  deleteAuthCode(id: number): Promise<boolean>;
+  deleteAuthCode(id: string): Promise<boolean>;
   deleteExpiredAuthCodes(): Promise<void>;
 
   // Account operations
-  getAccountById(id: number): Promise<Account | undefined>;
+  getAccountById(id: string): Promise<Account | undefined>;
   createAccount(account: InsertAccount): Promise<Account>;
-  updateAccount(id: number, updates: Partial<InsertAccount>): Promise<Account | undefined>;
-  deleteAccount(id: number): Promise<boolean>;
-  getUserAccounts(userId: number): Promise<(Account & { role: string; memberCount: number })[]>;
+  updateAccount(id: string, updates: Partial<InsertAccount>): Promise<Account | undefined>;
+  deleteAccount(id: string): Promise<boolean>;
+  getUserAccounts(userId: string): Promise<(Account & { role: string; memberCount: number })[]>;
 
   // Account member operations
-  getAccountMembers(accountId: number): Promise<(AccountMember & { user: User })[]>;
+  getAccountMembers(accountId: string): Promise<(AccountMember & { user: User })[]>;
   addAccountMember(member: InsertAccountMember): Promise<AccountMember>;
-  updateMemberRole(accountId: number, userId: number, role: string): Promise<AccountMember | undefined>;
-  removeAccountMember(accountId: number, userId: number): Promise<boolean>;
-  isUserAccountMember(accountId: number, userId: number): Promise<boolean>;
-  getUserRole(accountId: number, userId: number): Promise<string | undefined>;
+  updateMemberRole(accountId: string, userId: string, role: string): Promise<AccountMember | undefined>;
+  removeAccountMember(accountId: string, userId: string): Promise<boolean>;
+  isUserAccountMember(accountId: string, userId: string): Promise<boolean>;
+  getUserRole(accountId: string, userId: string): Promise<string | undefined>;
 
   // Vehicle operations
-  getAccountVehicles(accountId: number): Promise<Vehicle[]>;
-  getVehicleById(id: number): Promise<Vehicle | undefined>;
+  getAccountVehicles(accountId: string): Promise<Vehicle[]>;
+  getVehicleById(id: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
-  updateVehicle(id: number, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined>;
-  deleteVehicle(id: number): Promise<boolean>;
+  updateVehicle(id: string, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined>;
+  deleteVehicle(id: string): Promise<boolean>;
 
   // Receipt operations
-  getAccountReceipts(accountId: number): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
+  getAccountReceipts(accountId: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
   getReceipt(id: string): Promise<Receipt | undefined>;
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
   updateReceipt(id: string, updates: Partial<InsertReceipt>): Promise<Receipt | undefined>;
@@ -80,7 +80,7 @@ export class DbStorage implements IStorage {
     return user;
   }
 
-  async getUserById(id: number): Promise<User | undefined> {
+  async getUserById(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
     return user;
   }
@@ -134,7 +134,7 @@ export class DbStorage implements IStorage {
     return authCode;
   }
 
-  async deleteAuthCode(id: number): Promise<boolean> {
+  async deleteAuthCode(id: string): Promise<boolean> {
     const result = await db.delete(schema.authCodes).where(eq(schema.authCodes.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }
@@ -144,7 +144,7 @@ export class DbStorage implements IStorage {
   }
 
   // Account operations
-  async getAccountById(id: number): Promise<Account | undefined> {
+  async getAccountById(id: string): Promise<Account | undefined> {
     const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.id, id)).limit(1);
     return account;
   }
@@ -159,17 +159,17 @@ export class DbStorage implements IStorage {
     return account;
   }
 
-  async updateAccount(id: number, updates: Partial<InsertAccount>): Promise<Account | undefined> {
+  async updateAccount(id: string, updates: Partial<InsertAccount>): Promise<Account | undefined> {
     const [updated] = await db.update(schema.accounts).set(updates).where(eq(schema.accounts.id, id)).returning();
     return updated;
   }
 
-  async deleteAccount(id: number): Promise<boolean> {
+  async deleteAccount(id: string): Promise<boolean> {
     const result = await db.delete(schema.accounts).where(eq(schema.accounts.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
-  async getUserAccounts(userId: number): Promise<(Account & { role: string; memberCount: number })[]> {
+  async getUserAccounts(userId: string): Promise<(Account & { role: string; memberCount: number })[]> {
     const result = await db
       .select()
       .from(schema.accounts)
@@ -195,7 +195,7 @@ export class DbStorage implements IStorage {
   }
 
   // Account member operations
-  async getAccountMembers(accountId: number): Promise<(AccountMember & { user: User })[]> {
+  async getAccountMembers(accountId: string): Promise<(AccountMember & { user: User })[]> {
     const members = await db
       .select({
         id: schema.accountMembers.id,
@@ -217,7 +217,7 @@ export class DbStorage implements IStorage {
     return member;
   }
 
-  async updateMemberRole(accountId: number, userId: number, role: string): Promise<AccountMember | undefined> {
+  async updateMemberRole(accountId: string, userId: string, role: string): Promise<AccountMember | undefined> {
     const [updated] = await db
       .update(schema.accountMembers)
       .set({ role })
@@ -226,14 +226,14 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
-  async removeAccountMember(accountId: number, userId: number): Promise<boolean> {
+  async removeAccountMember(accountId: string, userId: string): Promise<boolean> {
     const result = await db
       .delete(schema.accountMembers)
       .where(and(eq(schema.accountMembers.accountId, accountId), eq(schema.accountMembers.userId, userId)));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
-  async isUserAccountMember(accountId: number, userId: number): Promise<boolean> {
+  async isUserAccountMember(accountId: string, userId: string): Promise<boolean> {
     const [member] = await db
       .select()
       .from(schema.accountMembers)
@@ -242,7 +242,7 @@ export class DbStorage implements IStorage {
     return !!member;
   }
 
-  async getUserRole(accountId: number, userId: number): Promise<string | undefined> {
+  async getUserRole(accountId: string, userId: string): Promise<string | undefined> {
     const [member] = await db
       .select()
       .from(schema.accountMembers)
@@ -252,11 +252,11 @@ export class DbStorage implements IStorage {
   }
 
   // Vehicle operations
-  async getAccountVehicles(accountId: number): Promise<Vehicle[]> {
+  async getAccountVehicles(accountId: string): Promise<Vehicle[]> {
     return db.select().from(schema.vehicles).where(eq(schema.vehicles.accountId, accountId));
   }
 
-  async getVehicleById(id: number): Promise<Vehicle | undefined> {
+  async getVehicleById(id: string): Promise<Vehicle | undefined> {
     const [vehicle] = await db.select().from(schema.vehicles).where(eq(schema.vehicles.id, id)).limit(1);
     return vehicle;
   }
@@ -266,18 +266,18 @@ export class DbStorage implements IStorage {
     return vehicle;
   }
 
-  async updateVehicle(id: number, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined> {
+  async updateVehicle(id: string, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined> {
     const [updated] = await db.update(schema.vehicles).set(updates).where(eq(schema.vehicles.id, id)).returning();
     return updated;
   }
 
-  async deleteVehicle(id: number): Promise<boolean> {
+  async deleteVehicle(id: string): Promise<boolean> {
     const result = await db.delete(schema.vehicles).where(eq(schema.vehicles.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Receipt operations
-  async getAccountReceipts(accountId: number): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]> {
+  async getAccountReceipts(accountId: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]> {
     const receipts = await db
       .select({
         receipt: schema.receipts,
