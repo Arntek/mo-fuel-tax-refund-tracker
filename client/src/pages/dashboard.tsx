@@ -94,7 +94,7 @@ export default function Dashboard() {
     return null;
   }
 
-  if (accountLoading || vehiclesLoading) {
+  if (accountLoading || vehiclesLoading || receiptsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
