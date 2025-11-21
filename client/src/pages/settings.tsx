@@ -3,13 +3,15 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AccountHeader } from "@/components/account-header";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Account } from "@shared/schema";
+import type { Account, User } from "@shared/schema";
 
 // Helper functions for obfuscation
 function obfuscateSSN(ssn: string): string {
@@ -39,6 +41,10 @@ export default function Settings() {
 
   const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
   });
 
   const [formData, setFormData] = useState({
@@ -88,7 +94,7 @@ export default function Settings() {
         city: account.city || "",
         state: account.state || "",
         zipCode: account.zipCode || "",
-        emailAddress: account.emailAddress || "",
+        emailAddress: account.emailAddress || currentUser?.email || "",
         phoneNumber: account.phoneNumber || "",
       });
       setDisplayValues({
@@ -97,7 +103,7 @@ export default function Settings() {
         spouseSsn: obfuscateSSN(account.spouseSsn || ""),
       });
     }
-  }, [account]);
+  }, [account, currentUser]);
 
   const updateAccountMutation = useMutation({
     mutationFn: async () => {
@@ -228,8 +234,9 @@ export default function Settings() {
               
               <div className="space-y-6">
                 {/* Claimant Section */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-muted-foreground">Claimant</h4>
+                <div className="space-y-4 pb-6">
+                  <h4 className="text-base font-semibold">Claimant</h4>
+                  <Separator />
                   
                   {/* Business - only for business accounts */}
                   {formData.type === "business" && (
@@ -266,7 +273,7 @@ export default function Settings() {
                     <p className="text-sm font-medium text-muted-foreground mb-3">Person <span className="text-destructive">*</span></p>
                     <div className="grid grid-cols-6 gap-2 mb-4">
                       <div className="col-span-3 space-y-2">
-                        <Label htmlFor="first-name">First Name</Label>
+                        <Label htmlFor="first-name">First Name <span className="text-destructive">*</span></Label>
                         <Input
                           id="first-name"
                           value={formData.firstName}
@@ -285,7 +292,7 @@ export default function Settings() {
                         />
                       </div>
                       <div className="col-span-2 space-y-2">
-                        <Label htmlFor="last-name">Last Name</Label>
+                        <Label htmlFor="last-name">Last Name <span className="text-destructive">*</span></Label>
                         <Input
                           id="last-name"
                           value={formData.lastName}
@@ -296,7 +303,7 @@ export default function Settings() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="ssn">Social Security Number</Label>
+                      <Label htmlFor="ssn">Social Security Number <span className="text-destructive">*</span></Label>
                       <Input
                         id="ssn"
                         value={formData.ssn}
@@ -313,8 +320,9 @@ export default function Settings() {
                 </div>
 
                 {/* Spouse Section - Optional */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-muted-foreground">Spouse</h4>
+                <div className="space-y-4 pb-6">
+                  <h4 className="text-base font-semibold">Spouse</h4>
+                  <Separator />
                   
                   <div className="grid grid-cols-6 gap-2">
                     <div className="col-span-3 space-y-2">
@@ -364,11 +372,12 @@ export default function Settings() {
                 </div>
 
                 {/* Contact Section - Required */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-muted-foreground">Contact <span className="text-destructive">*</span></h4>
+                <div className="space-y-4 pb-6">
+                  <h4 className="text-base font-semibold">Contact <span className="text-destructive">*</span></h4>
+                  <Separator />
                   
                   <div className="space-y-2">
-                    <Label htmlFor="mailing-address">Address</Label>
+                    <Label htmlFor="mailing-address">Address <span className="text-destructive">*</span></Label>
                     <Input
                       id="mailing-address"
                       value={formData.mailingAddress}
@@ -409,7 +418,7 @@ export default function Settings() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email-address">Email</Label>
+                    <Label htmlFor="email-address">Email <span className="text-destructive">*</span></Label>
                     <Input
                       id="email-address"
                       type="email"
@@ -420,7 +429,7 @@ export default function Settings() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone-number">Phone</Label>
+                    <Label htmlFor="phone-number">Phone <span className="text-destructive">*</span></Label>
                     <Input
                       id="phone-number"
                       value={formData.phoneNumber}
@@ -434,7 +443,20 @@ export default function Settings() {
 
             <Button 
               onClick={() => updateAccountMutation.mutate()}
-              disabled={!formData.name || updateAccountMutation.isPending}
+              disabled={
+                !formData.name ||
+                !formData.firstName ||
+                !formData.lastName ||
+                !formData.ssn ||
+                !formData.mailingAddress ||
+                !formData.city ||
+                !formData.state ||
+                !formData.zipCode ||
+                !formData.emailAddress ||
+                !formData.phoneNumber ||
+                (formData.type === "business" && (!formData.businessName || !formData.fein)) ||
+                updateAccountMutation.isPending
+              }
               data-testid="button-update-account"
               className="w-full"
             >
