@@ -14,7 +14,8 @@ export default function Auth() {
   const [step, setStep] = useState<"landing" | "email" | "code" | "signup">("landing");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [accountName, setAccountName] = useState("");
   const [accountType, setAccountType] = useState<"family" | "business">("family");
   const [loading, setLoading] = useState(false);
@@ -93,9 +94,10 @@ export default function Auth() {
         method: "POST",
         body: JSON.stringify({
           email,
-          name,
+          firstName,
+          lastName,
           code,
-          accountName: accountName || `${name}'s Account`,
+          accountName: accountName || `${firstName} ${lastName}'s Account`,
           accountType,
         }),
       });
@@ -307,15 +309,27 @@ export default function Auth() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="name">Your Name</Label>
+                <Label htmlFor="first-name">First Name</Label>
                 <Input
-                  id="name"
+                  id="first-name"
                   type="text"
-                  placeholder="John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   required
-                  data-testid="input-name"
+                  data-testid="input-first-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="last-name">Last Name</Label>
+                <Input
+                  id="last-name"
+                  type="text"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  data-testid="input-last-name"
                 />
               </div>
               <div className="space-y-2">

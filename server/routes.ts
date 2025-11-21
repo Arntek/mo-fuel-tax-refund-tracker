@@ -139,10 +139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, name, code, accountName, accountType } = req.body;
+      const { email, firstName, lastName, code, accountName, accountType } = req.body;
       
-      if (!email || !name || !code) {
-        return res.status(400).json({ error: "Email, name, and code required" });
+      if (!email || !firstName || !lastName || !code) {
+        return res.status(400).json({ error: "Email, first name, last name, and code required" });
       }
       
       const isValid = await verifyAuthCode(email, code);
@@ -157,11 +157,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: "User already exists" });
       }
       
-      const validated = insertUserSchema.parse({ email, name });
+      const validated = insertUserSchema.parse({ email, firstName, lastName });
       const user = await storage.createUser(validated);
       
       const account = await storage.createAccount({
-        name: accountName || `${name}'s Account`,
+        name: accountName || `${firstName} ${lastName}'s Account`,
         type: accountType || "family",
         ownerId: user.id,
       });
