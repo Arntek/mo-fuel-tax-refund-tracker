@@ -13,6 +13,12 @@ export function DashboardSummary({ receipts, fiscalYear }: DashboardSummaryProps
   const receiptCount = receipts.length;
 
   const daysUntilDeadline = getDaysUntilDeadline();
+  
+  if (!fiscalYear) {
+    return null;
+  }
+
+  const [startYear, endYear] = fiscalYear.split('-');
 
   const summaryCards = [
     {
@@ -55,7 +61,7 @@ export function DashboardSummary({ receipts, fiscalYear }: DashboardSummaryProps
           Fiscal Year {fiscalYear} Summary
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          July 1, {fiscalYear.split('-')[0]} - June 30, {fiscalYear.split('-')[1]}
+          July 1, {startYear} - June 30, {endYear}
         </p>
       </div>
       

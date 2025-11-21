@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("members");
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
 
   const { data: account } = useQuery<Account>({
@@ -105,23 +106,18 @@ export default function Dashboard() {
       <header className="border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 bg-background z-50">
         <div className="flex items-center gap-2 sm:gap-4">
           <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-          <div>
+          <button 
+            onClick={handleSwitchAccount}
+            className="text-left hover-elevate active-elevate-2 rounded-md px-2 py-1"
+            data-testid="button-account-name"
+          >
             <h1 className="text-base sm:text-lg font-semibold">{account?.name || "Receipt Tracker"}</h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">
+            <p className="text-xs text-muted-foreground">
               {account?.type === "family" ? "Family" : "Business"} Account
             </p>
-          </div>
+          </button>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleSwitchAccount}
-            data-testid="button-switch-account"
-            className="hidden sm:flex"
-          >
-            <Users className="w-4 h-4" />
-          </Button>
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" data-testid="button-settings">
@@ -132,7 +128,7 @@ export default function Dashboard() {
               <DialogHeader>
                 <DialogTitle>Account Settings</DialogTitle>
               </DialogHeader>
-              <SettingsContent accountId={accountId} members={members} vehicles={vehicles} />
+              <SettingsContent accountId={accountId} members={members} vehicles={vehicles} activeTab={settingsTab} onTabChange={setSettingsTab} />
             </DialogContent>
           </Dialog>
           <ThemeToggle />
@@ -145,8 +141,6 @@ export default function Dashboard() {
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
-        <DashboardSummary receipts={receipts} fiscalYear={fiscalYear} />
-
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Upload Receipt</h2>
           
@@ -180,7 +174,13 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button onClick={() => setSettingsOpen(true)} data-testid="button-add-vehicle-prompt">
+                <Button 
+                  onClick={() => {
+                    setSettingsTab("vehicles");
+                    setSettingsOpen(true);
+                  }} 
+                  data-testid="button-add-vehicle-prompt"
+                >
                   Add Vehicle
                 </Button>
               </CardContent>
@@ -202,6 +202,8 @@ export default function Dashboard() {
           )}
         </div>
 
+        <DashboardSummary receipts={receipts} fiscalYear={fiscalYear} />
+
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Receipts</h2>
           {receiptsLoading ? (
@@ -219,9 +221,9 @@ export default function Dashboard() {
   );
 }
 
-function SettingsContent({ accountId, members, vehicles }: { accountId: number; members: Member[]; vehicles: Vehicle[] }) {
+function SettingsContent({ accountId, members, vehicles, activeTab, onTabChange }: { accountId: number; members: Member[]; vehicles: Vehicle[]; activeTab: string; onTabChange: (tab: string) => void }) {
   return (
-    <Tabs defaultValue="members" className="w-full">
+    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="members">Members</TabsTrigger>
         <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
