@@ -237,6 +237,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/accounts/:accountId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      const validated = insertAccountSchema.partial().omit({ ownerId: true }).parse(req.body);
+      const updated = await storage.updateAccount(req.accountId, validated);
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Account not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating account:", error);
+      res.status(500).json({ error: "Failed to update account" });
+    }
+  });
+
   app.get("/api/accounts/:accountId/members", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
       const members = await storage.getAccountMembers(req.accountId);
