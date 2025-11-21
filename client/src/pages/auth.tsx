@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,18 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [userExists, setUserExists] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        await apiRequest("/api/auth/me", { method: "GET" });
+        setLocation("/accounts");
+      } catch {
+        // User not logged in, stay on auth page
+      }
+    };
+    checkSession();
+  }, [setLocation]);
 
   const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
