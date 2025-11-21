@@ -1,11 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, Users, ChevronRight, LogOut } from "lucide-react";
+import { Receipt, Users, ChevronRight, LogOut, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Account = {
   id: number;
@@ -18,9 +29,43 @@ type Account = {
 export default function Accounts() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
+  const [newAccountType, setNewAccountType] = useState<"family" | "business">("family");
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
+  });
+
+  const createAccountMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/accounts", {
+        method: "POST",
+        body: JSON.stringify({ name: newAccountName, type: newAccountType }),
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      setCreateDialogOpen(false);
+      setNewAccountName("");
+      setNewAccountType("family");
+      toast({
+        title: "Account created",
+        description: "Your new account has been created successfully",
+      });
+      if (data.id) {
+        handleSelectAccount(data.id);
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create account",
+        variant: "destructive",
+      });
+      setNewAccountName("");
+      setNewAccountType("family");
+    },
   });
 
   const handleLogout = async () => {
@@ -113,11 +158,67 @@ export default function Accounts() {
               <CardHeader className="text-center py-12">
                 <CardTitle>No Accounts Found</CardTitle>
                 <CardDescription>
-                  You don't have access to any accounts yet.
+                  You don't have access to any accounts yet. Create one to get started.
                 </CardDescription>
               </CardHeader>
             </Card>
           )}
+
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full" variant="outline" data-testid="button-create-account">
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Account</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-account-name">Account Name</Label>
+                  <Input
+                    id="new-account-name"
+                    placeholder="e.g., Smith Family, ABC Corp"
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    data-testid="input-new-account-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-account-type">Account Type</Label>
+                  <Select value={newAccountType} onValueChange={(value: "family" | "business") => setNewAccountType(value)}>
+                    <SelectTrigger id="new-account-type" data-testid="select-new-account-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="family">Family</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={() => {
+                    if (!newAccountName.trim()) {
+                      toast({
+                        title: "Validation error",
+                        description: "Account name is required",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    createAccountMutation.mutate();
+                  }}
+                  disabled={!newAccountName.trim() || createAccountMutation.isPending}
+                  className="w-full"
+                  data-testid="button-save-new-account"
+                >
+                  {createAccountMutation.isPending ? "Creating..." : "Create Account"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </main>
     </div>

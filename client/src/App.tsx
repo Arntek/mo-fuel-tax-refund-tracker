@@ -7,6 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Auth from "@/pages/auth";
 import Accounts from "@/pages/accounts";
 import Dashboard from "@/pages/dashboard";
+import People from "@/pages/people";
+import Vehicles from "@/pages/vehicles";
 import NotFound from "@/pages/not-found";
 
 function AuthCheck({ children }: { children: React.ReactNode }) {
@@ -42,6 +44,16 @@ function Router() {
       <Route path="/dashboard/:accountId">
         <AuthCheck>
           <Dashboard />
+        </AuthCheck>
+      </Route>
+      <Route path="/people/:accountId">
+        <AuthCheck>
+          <People />
+        </AuthCheck>
+      </Route>
+      <Route path="/vehicles/:accountId">
+        <AuthCheck>
+          <Vehicles />
         </AuthCheck>
       </Route>
       <Route component={NotFound} />
