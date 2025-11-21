@@ -171,27 +171,21 @@ export class DbStorage implements IStorage {
 
   async getUserAccounts(userId: number): Promise<(Account & { role: string; memberCount: number })[]> {
     const result = await db
-      .select({
-        id: schema.accounts.id,
-        name: schema.accounts.name,
-        type: schema.accounts.type,
-        ownerId: schema.accounts.ownerId,
-        createdAt: schema.accounts.createdAt,
-        role: schema.accountMembers.role,
-      })
+      .select()
       .from(schema.accounts)
       .innerJoin(schema.accountMembers, eq(schema.accounts.id, schema.accountMembers.accountId))
       .where(eq(schema.accountMembers.userId, userId))
       .orderBy(desc(schema.accounts.createdAt));
 
     const accountsWithCounts = await Promise.all(
-      result.map(async (account) => {
+      result.map(async (row) => {
         const members = await db
           .select()
           .from(schema.accountMembers)
-          .where(eq(schema.accountMembers.accountId, account.id));
+          .where(eq(schema.accountMembers.accountId, row.accounts.id));
         return {
-          ...account,
+          ...row.accounts,
+          role: row.account_members.role,
           memberCount: members.length,
         };
       })

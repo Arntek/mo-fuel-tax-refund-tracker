@@ -27,12 +27,12 @@ export default function Vehicles() {
   const [weightUnder26000, setWeightUnder26000] = useState(true);
   const [lookingUpVin, setLookingUpVin] = useState(false);
 
-  const { data: account } = useQuery<Account>({
+  const { data: account, isLoading: accountLoading } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
   });
 
-  const { data: vehicles = [] } = useQuery<Vehicle[]>({
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
     queryKey: ["/api/accounts", accountId, "vehicles"],
     enabled: !!accountId,
   });
@@ -153,6 +153,17 @@ export default function Vehicles() {
   if (!accountId) {
     setLocation("/accounts");
     return null;
+  }
+
+  if (accountLoading || vehiclesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="mt-4 text-muted-foreground">Loading vehicles...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

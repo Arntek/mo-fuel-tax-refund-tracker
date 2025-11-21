@@ -36,7 +36,7 @@ export default function Dashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
 
-  const { data: account } = useQuery<Account>({
+  const { data: account, isLoading: accountLoading } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
   });
@@ -46,7 +46,7 @@ export default function Dashboard() {
     enabled: !!accountId,
   });
 
-  const { data: vehicles = [] } = useQuery<Vehicle[]>({
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
     queryKey: ["/api/accounts", accountId, "vehicles"],
     enabled: !!accountId,
   });
@@ -92,6 +92,17 @@ export default function Dashboard() {
   if (!accountId) {
     setLocation("/accounts");
     return null;
+  }
+
+  if (accountLoading || vehiclesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="mt-4 text-muted-foreground">Loading account...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

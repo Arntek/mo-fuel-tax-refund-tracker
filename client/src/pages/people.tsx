@@ -21,12 +21,12 @@ export default function People() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
 
-  const { data: account } = useQuery<Account>({
+  const { data: account, isLoading: accountLoading } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
   });
 
-  const { data: members = [] } = useQuery<Member[]>({
+  const { data: members = [], isLoading: membersLoading } = useQuery<Member[]>({
     queryKey: ["/api/accounts", accountId, "members"],
     enabled: !!accountId,
   });
@@ -106,6 +106,17 @@ export default function People() {
   if (!accountId) {
     setLocation("/accounts");
     return null;
+  }
+
+  if (accountLoading || membersLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="mt-4 text-muted-foreground">Loading people...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
