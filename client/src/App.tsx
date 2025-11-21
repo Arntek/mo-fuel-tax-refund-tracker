@@ -9,6 +9,7 @@ import Accounts from "@/pages/accounts";
 import Dashboard from "@/pages/dashboard";
 import People from "@/pages/people";
 import Vehicles from "@/pages/vehicles";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function AuthCheck({ children }: { children: React.ReactNode }) {
@@ -54,6 +55,11 @@ function Router() {
       <Route path="/vehicles/:accountId">
         <AuthCheck>
           <Vehicles />
+        </AuthCheck>
+      </Route>
+      <Route path="/settings/:accountId">
+        <AuthCheck>
+          <Settings />
         </AuthCheck>
       </Route>
       <Route component={NotFound} />
