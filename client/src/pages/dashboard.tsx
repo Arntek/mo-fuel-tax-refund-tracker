@@ -79,6 +79,22 @@ export default function Dashboard() {
     setLocation("/accounts");
   };
 
+  const getCurrentFiscalYear = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    if (currentMonth >= 7) {
+      return `${currentYear}-${currentYear + 1}`;
+    } else {
+      return `${currentYear - 1}-${currentYear}`;
+    }
+  };
+
+  const fiscalYear = receipts.length > 0 
+    ? receipts[0].fiscalYear 
+    : getCurrentFiscalYear();
+
   if (!accountId) {
     setLocation("/accounts");
     return null;
@@ -129,7 +145,7 @@ export default function Dashboard() {
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
-        <DashboardSummary receipts={receipts} />
+        <DashboardSummary receipts={receipts} fiscalYear={fiscalYear} />
 
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Upload Receipt</h2>
