@@ -3,7 +3,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, LogOut, ArrowLeft, ChevronDown } from "lucide-react";
+import { Receipt, LogOut, Users, Car, Settings, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -186,6 +186,26 @@ export default function Vehicles() {
           </button>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
+          <Link href={`/dashboard/${accountId}`}>
+            <Button variant="ghost" size="icon" data-testid="button-dashboard">
+              <Receipt className="w-4 h-4" />
+            </Button>
+          </Link>
+          <Link href={`/people/${accountId}`}>
+            <Button variant="ghost" size="icon" data-testid="button-people">
+              <Users className="w-4 h-4" />
+            </Button>
+          </Link>
+          <Link href={`/vehicles/${accountId}`}>
+            <Button variant="ghost" size="icon" data-testid="button-vehicles">
+              <Car className="w-4 h-4" />
+            </Button>
+          </Link>
+          <Link href={`/settings/${accountId}`}>
+            <Button variant="ghost" size="icon" data-testid="button-settings">
+              <Settings className="w-4 h-4" />
+            </Button>
+          </Link>
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
             <LogOut className="w-4 h-4" />
