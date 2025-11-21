@@ -11,10 +11,12 @@ import { Loader2 } from "lucide-react";
 
 interface ReceiptModalProps {
   receipt: Receipt;
+  accountId: number;
+  open: boolean;
   onClose: () => void;
 }
 
-export function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
+export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModalProps) {
   const [formData, setFormData] = useState({
     date: receipt.date,
     stationName: receipt.stationName,
@@ -28,10 +30,13 @@ export function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("PUT", `/api/receipts/${receipt.id}`, data);
+      return apiRequest(`/api/accounts/${accountId}/receipts/${receipt.id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
       toast({
         title: "Receipt updated",
         description: "Changes saved successfully",
@@ -53,7 +58,7 @@ export function ReceiptModal({ receipt, onClose }: ReceiptModalProps) {
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Receipt Details</DialogTitle>

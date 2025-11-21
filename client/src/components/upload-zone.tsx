@@ -6,7 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Loader2 } from "lucide-react";
 
-export function UploadZone() {
+type UploadZoneProps = {
+  accountId: number;
+  vehicleId: number;
+};
+
+export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -18,10 +23,12 @@ export function UploadZone() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("receipt", file);
+      formData.append("vehicleId", vehicleId.toString());
       
-      const response = await fetch("/api/receipts/upload", {
+      const response = await fetch(`/api/accounts/${accountId}/receipts/upload`, {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
       
       if (!response.ok) {
@@ -35,7 +42,7 @@ export function UploadZone() {
       setIsProcessing(true);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
       toast({
         title: "Receipt uploaded successfully",
         description: "AI transcription completed",

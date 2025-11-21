@@ -7,6 +7,7 @@ import { Eye, Trash2, ArrowUpDown } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ReceiptModal } from "@/components/receipt-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,25 +21,28 @@ import {
 
 interface ReceiptTableProps {
   receipts: Receipt[];
-  onViewReceipt: (receipt: Receipt) => void;
+  accountId: number;
 }
 
 type SortField = "date" | "stationName" | "gallons" | "totalAmount";
 type SortDirection = "asc" | "desc";
 
-export function ReceiptTable({ receipts, onViewReceipt }: ReceiptTableProps) {
+export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<Receipt | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/receipts/${id}`);
+      return apiRequest(`/api/accounts/${accountId}/receipts/${id}`, {
+        method: "DELETE",
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
       toast({
         title: "Receipt deleted",
         description: "The receipt has been removed successfully",
@@ -163,7 +167,7 @@ export function ReceiptTable({ receipts, onViewReceipt }: ReceiptTableProps) {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => onViewReceipt(receipt)}
+                          onClick={() => setViewingReceipt(receipt)}
                           data-testid={`button-view-${receipt.id}`}
                         >
                           <Eye className="w-4 h-4" />
@@ -238,7 +242,7 @@ export function ReceiptTable({ receipts, onViewReceipt }: ReceiptTableProps) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => onViewReceipt(receipt)}
+                    onClick={() => setViewingReceipt(receipt)}
                     data-testid={`button-view-mobile-${receipt.id}`}
                   >
                     <Eye className="w-4 h-4 mr-1" />
@@ -258,6 +262,15 @@ export function ReceiptTable({ receipts, onViewReceipt }: ReceiptTableProps) {
           ))}
         </div>
       </div>
+
+      {viewingReceipt && (
+        <ReceiptModal
+          receipt={viewingReceipt}
+          accountId={accountId}
+          open={!!viewingReceipt}
+          onClose={() => setViewingReceipt(null)}
+        />
+      )}
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
