@@ -225,14 +225,33 @@ export default function Dashboard() {
 
 function SettingsContent({ account, accountId }: { account: Account; accountId: number }) {
   const { toast } = useToast();
-  const [accountName, setAccountName] = useState(account?.name || "");
-  const [accountType, setAccountType] = useState<"family" | "business">(account?.type || "family");
+  const [formData, setFormData] = useState({
+    name: account?.name || "",
+    type: account?.type || "family",
+    businessName: account?.businessName || "",
+    fein: account?.fein || "",
+    firstName: account?.firstName || "",
+    middleInitial: account?.middleInitial || "",
+    lastName: account?.lastName || "",
+    ssn: account?.ssn || "",
+    spouseFirstName: account?.spouseFirstName || "",
+    spouseMiddleInitial: account?.spouseMiddleInitial || "",
+    spouseLastName: account?.spouseLastName || "",
+    spouseSsn: account?.spouseSsn || "",
+    mailingAddress: account?.mailingAddress || "",
+    city: account?.city || "",
+    state: account?.state || "",
+    zipCode: account?.zipCode || "",
+    emailAddress: account?.emailAddress || "",
+    phoneNumber: account?.phoneNumber || "",
+    faxNumber: account?.faxNumber || "",
+  });
 
   const updateAccountMutation = useMutation({
     mutationFn: async () => {
       return apiRequest(`/api/accounts/${accountId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: accountName, type: accountType }),
+        body: JSON.stringify(formData),
       });
     },
     onSuccess: () => {
@@ -251,20 +270,25 @@ function SettingsContent({ account, accountId }: { account: Account; accountId: 
     },
   });
 
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       <div className="space-y-2">
         <Label htmlFor="account-name">Account Name</Label>
         <Input
           id="account-name"
-          value={accountName}
-          onChange={(e) => setAccountName(e.target.value)}
+          value={formData.name}
+          onChange={(e) => handleChange("name", e.target.value)}
           data-testid="input-account-name"
         />
       </div>
+      
       <div className="space-y-2">
         <Label htmlFor="account-type">Account Type</Label>
-        <Select value={accountType} onValueChange={(value: "family" | "business") => setAccountType(value)}>
+        <Select value={formData.type} onValueChange={(value) => handleChange("type", value)}>
           <SelectTrigger id="account-type" data-testid="select-account-type">
             <SelectValue />
           </SelectTrigger>
@@ -274,12 +298,196 @@ function SettingsContent({ account, accountId }: { account: Account; accountId: 
           </SelectContent>
         </Select>
       </div>
+
+      <div className="border-t pt-4 mt-4">
+        <h3 className="font-semibold mb-3">Tax Form Information</h3>
+        
+        <div className="space-y-2">
+          <Label htmlFor="business-name">Business Name</Label>
+          <Input
+            id="business-name"
+            value={formData.businessName}
+            onChange={(e) => handleChange("businessName", e.target.value)}
+            data-testid="input-business-name"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="fein">FEIN</Label>
+          <Input
+            id="fein"
+            value={formData.fein}
+            onChange={(e) => handleChange("fein", e.target.value)}
+            placeholder="XX-XXXXXXX"
+            data-testid="input-fein"
+          />
+        </div>
+
+        <div className="grid grid-cols-6 gap-2">
+          <div className="col-span-3 space-y-2">
+            <Label htmlFor="first-name">First Name</Label>
+            <Input
+              id="first-name"
+              value={formData.firstName}
+              onChange={(e) => handleChange("firstName", e.target.value)}
+              data-testid="input-first-name"
+            />
+          </div>
+          <div className="col-span-1 space-y-2">
+            <Label htmlFor="mi">MI</Label>
+            <Input
+              id="mi"
+              value={formData.middleInitial}
+              onChange={(e) => handleChange("middleInitial", e.target.value)}
+              maxLength={2}
+              data-testid="input-middle-initial"
+            />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <Label htmlFor="last-name">Last Name</Label>
+            <Input
+              id="last-name"
+              value={formData.lastName}
+              onChange={(e) => handleChange("lastName", e.target.value)}
+              data-testid="input-last-name"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ssn">Social Security Number</Label>
+          <Input
+            id="ssn"
+            value={formData.ssn}
+            onChange={(e) => handleChange("ssn", e.target.value)}
+            placeholder="XXX-XX-XXXX"
+            data-testid="input-ssn"
+          />
+        </div>
+
+        <div className="grid grid-cols-6 gap-2">
+          <div className="col-span-3 space-y-2">
+            <Label htmlFor="spouse-first-name">Spouse's First Name</Label>
+            <Input
+              id="spouse-first-name"
+              value={formData.spouseFirstName}
+              onChange={(e) => handleChange("spouseFirstName", e.target.value)}
+              data-testid="input-spouse-first-name"
+            />
+          </div>
+          <div className="col-span-1 space-y-2">
+            <Label htmlFor="spouse-mi">MI</Label>
+            <Input
+              id="spouse-mi"
+              value={formData.spouseMiddleInitial}
+              onChange={(e) => handleChange("spouseMiddleInitial", e.target.value)}
+              maxLength={2}
+              data-testid="input-spouse-middle-initial"
+            />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <Label htmlFor="spouse-last-name">Spouse's Last Name</Label>
+            <Input
+              id="spouse-last-name"
+              value={formData.spouseLastName}
+              onChange={(e) => handleChange("spouseLastName", e.target.value)}
+              data-testid="input-spouse-last-name"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="spouse-ssn">Spouse's Social Security Number</Label>
+          <Input
+            id="spouse-ssn"
+            value={formData.spouseSsn}
+            onChange={(e) => handleChange("spouseSsn", e.target.value)}
+            placeholder="XXX-XX-XXXX"
+            data-testid="input-spouse-ssn"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="mailing-address">Mailing Address</Label>
+          <Input
+            id="mailing-address"
+            value={formData.mailingAddress}
+            onChange={(e) => handleChange("mailingAddress", e.target.value)}
+            data-testid="input-mailing-address"
+          />
+        </div>
+
+        <div className="grid grid-cols-6 gap-2">
+          <div className="col-span-3 space-y-2">
+            <Label htmlFor="city">City</Label>
+            <Input
+              id="city"
+              value={formData.city}
+              onChange={(e) => handleChange("city", e.target.value)}
+              data-testid="input-city"
+            />
+          </div>
+          <div className="col-span-1 space-y-2">
+            <Label htmlFor="state">State</Label>
+            <Input
+              id="state"
+              value={formData.state}
+              onChange={(e) => handleChange("state", e.target.value)}
+              maxLength={2}
+              data-testid="input-state"
+            />
+          </div>
+          <div className="col-span-2 space-y-2">
+            <Label htmlFor="zip-code">ZIP Code</Label>
+            <Input
+              id="zip-code"
+              value={formData.zipCode}
+              onChange={(e) => handleChange("zipCode", e.target.value)}
+              data-testid="input-zip-code"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="email-address">Email Address</Label>
+          <Input
+            id="email-address"
+            type="email"
+            value={formData.emailAddress}
+            onChange={(e) => handleChange("emailAddress", e.target.value)}
+            data-testid="input-email-address"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-2">
+            <Label htmlFor="phone-number">Phone Number</Label>
+            <Input
+              id="phone-number"
+              value={formData.phoneNumber}
+              onChange={(e) => handleChange("phoneNumber", e.target.value)}
+              data-testid="input-phone-number"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fax-number">Fax Number</Label>
+            <Input
+              id="fax-number"
+              value={formData.faxNumber}
+              onChange={(e) => handleChange("faxNumber", e.target.value)}
+              data-testid="input-fax-number"
+            />
+          </div>
+        </div>
+      </div>
+
       <Button 
         onClick={() => updateAccountMutation.mutate()}
-        disabled={!accountName || updateAccountMutation.isPending}
+        disabled={!formData.name || updateAccountMutation.isPending}
         data-testid="button-update-account"
+        className="w-full"
       >
-        Save Changes
+        {updateAccountMutation.isPending ? "Saving..." : "Save Changes"}
       </Button>
     </div>
   );
