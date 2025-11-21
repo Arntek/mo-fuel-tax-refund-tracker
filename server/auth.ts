@@ -1,5 +1,13 @@
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
+import sgMail from "@sendgrid/mail";
+
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@receipttracker.com";
+
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+}
 
 export function generateAuthCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -10,13 +18,44 @@ export function generateSessionId(): string {
 }
 
 export async function sendAuthCodeEmail(email: string, code: string): Promise<void> {
-  console.log("========================================");
-  console.log("AUTH CODE EMAIL");
-  console.log(`To: ${email}`);
-  console.log(`Code: ${code}`);
-  console.log("========================================");
-  console.log("In production, this would send an actual email.");
-  console.log("For development, check the server logs above for the auth code.");
+  if (!SENDGRID_API_KEY) {
+    console.log("========================================");
+    console.log("SENDGRID NOT CONFIGURED - DEV MODE");
+    console.log("AUTH CODE EMAIL");
+    console.log(`To: ${email}`);
+    console.log(`Code: ${code}`);
+    console.log("========================================");
+    console.log("Set SENDGRID_API_KEY and FROM_EMAIL environment variables to send real emails.");
+    return;
+  }
+
+  try {
+    await sgMail.send({
+      to: email,
+      from: FROM_EMAIL,
+      subject: "Your Receipt Tracker Login Code",
+      text: `Your login code is: ${code}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request this code, please ignore this email.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Receipt Tracker Login</h2>
+          <p>Your login code is:</p>
+          <div style="background-color: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
+            ${code}
+          </div>
+          <p style="color: #6b7280;">This code will expire in 15 minutes.</p>
+          <p style="color: #6b7280; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+        </div>
+      `,
+    });
+    console.log(`Email sent successfully to ${email}`);
+  } catch (error) {
+    console.error("Failed to send email via SendGrid:", error);
+    console.log("========================================");
+    console.log("FALLBACK - AUTH CODE (EMAIL SEND FAILED)");
+    console.log(`To: ${email}`);
+    console.log(`Code: ${code}`);
+    console.log("========================================");
+  }
 }
 
 export async function createAuthCodeForEmail(email: string): Promise<string> {
