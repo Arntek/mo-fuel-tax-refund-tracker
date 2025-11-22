@@ -566,14 +566,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      try {
-        const objectPath = receipt.imageUrl.replace(`${req.protocol}://${req.get('host')}`, '');
-        const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-        await objectStorageService.deleteObject(objectFile);
-      } catch (error) {
-        console.error("Error deleting image from object storage:", error);
-      }
+      // Delete image from object storage FIRST before deleting DB entry
+      const objectPath = receipt.imageUrl.replace(`${req.protocol}://${req.get('host')}`, '');
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      await objectStorageService.deleteObject(objectFile);
 
+      // Only delete DB entry after image is successfully deleted
       const deleted = await storage.deleteReceipt(id);
       
       if (!deleted) {
