@@ -53,8 +53,14 @@ export class ObjectStorageService {
       throw new ObjectNotFoundError();
     }
 
-    const bytes = await objectStorageClient.downloadAsBytes(objectPath);
-    return Buffer.from(bytes);
+    const stream = await objectStorageClient.downloadAsStream(objectPath);
+    
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
   }
 
   async downloadObject(objectPath: string, res: Response, cacheTtlSec: number = 3600) {
@@ -71,9 +77,8 @@ export class ObjectStorageService {
       const metadata = await getObjectMetadata(objectPath);
       const contentType = metadata?.contentType || "application/octet-stream";
       
-      // Use downloadAsBytes for more reliable serving
-      const bytes = await objectStorageClient.downloadAsBytes(objectPath);
-      const buffer = Buffer.from(bytes);
+      // Download as buffer using stream
+      const buffer = await this.downloadObjectAsBytes(objectPath);
       
       res.set({
         "Content-Type": contentType,
