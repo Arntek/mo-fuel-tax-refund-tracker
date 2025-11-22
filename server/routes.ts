@@ -455,10 +455,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { vehicleId } = req.body;
 
-      // Upload directly to object storage using Replit SDK
+      // Upload directly to object storage using Replit SDK, organized by accountId
       const objectPath = await objectStorageService.uploadObject(
         req.file.buffer,
-        req.file.mimetype
+        req.file.mimetype,
+        req.accountId
       );
 
       // Set ACL policy for the uploaded object
@@ -472,7 +473,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const fullImageUrl = `${req.protocol}://${req.get('host')}${normalizedPath}`;
 
-      const transcription = await transcribeReceipt(fullImageUrl);
+      // Transcribe using image bytes instead of URL (OpenAI can't access our private files)
+      const transcription = await transcribeReceipt(req.file.buffer, req.file.mimetype);
 
       const fiscalYear = getFiscalYear(transcription.date);
 

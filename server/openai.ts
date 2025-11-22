@@ -8,7 +8,7 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
-export async function transcribeReceipt(imageUrl: string): Promise<AiTranscription> {
+export async function transcribeReceipt(imageBuffer: Buffer, mimeType: string): Promise<AiTranscription> {
   const prompt = `You are analyzing a gas station receipt image. Extract the following information and return ONLY a valid JSON object with these exact fields:
 - date: Transaction date in YYYY-MM-DD format
 - stationName: Name of the gas station
@@ -20,6 +20,10 @@ If you cannot find a specific field, make your best estimate based on the receip
 
 Return ONLY the JSON object, no additional text or explanation.`;
 
+  // Convert buffer to base64 data URL
+  const base64Image = imageBuffer.toString('base64');
+  const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. However, gpt-4o is better for vision tasks
     messages: [
@@ -30,7 +34,7 @@ Return ONLY the JSON object, no additional text or explanation.`;
           {
             type: "image_url",
             image_url: {
-              url: imageUrl,
+              url: dataUrl,
             },
           },
         ],

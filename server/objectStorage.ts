@@ -12,7 +12,12 @@ import {
   deleteObjectMetadata,
 } from "./objectAcl";
 
-export const objectStorageClient = new Client();
+const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+if (!bucketId) {
+  throw new Error("DEFAULT_OBJECT_STORAGE_BUCKET_ID environment variable is not set");
+}
+
+export const objectStorageClient = new Client(bucketId);
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -26,20 +31,13 @@ export class ObjectStorageService {
   constructor() {}
 
   getPrivateObjectDir(): string {
-    const dir = process.env.PRIVATE_OBJECT_DIR || "";
-    if (!dir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
-    }
-    return dir;
+    return ".private";
   }
 
-  async uploadObject(fileBuffer: Buffer, contentType: string): Promise<string> {
+  async uploadObject(fileBuffer: Buffer, contentType: string, accountId: string): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     const objectId = randomUUID();
-    const objectPath = `${privateObjectDir}/receipts/${objectId}`;
+    const objectPath = `${privateObjectDir}/${accountId}/receipts/${objectId}`;
 
     await objectStorageClient.uploadFromBytes(objectPath, fileBuffer);
 
@@ -47,6 +45,16 @@ export class ObjectStorageService {
     await setObjectMetadata(objectPath, { contentType });
 
     return objectPath;
+  }
+
+  async downloadObjectAsBytes(objectPath: string): Promise<Buffer> {
+    const exists = await objectStorageClient.exists(objectPath);
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+
+    const bytes = await objectStorageClient.downloadAsBytes(objectPath);
+    return Buffer.from(bytes);
   }
 
   async downloadObject(objectPath: string, res: Response, cacheTtlSec: number = 3600) {
@@ -63,21 +71,17 @@ export class ObjectStorageService {
       const metadata = await getObjectMetadata(objectPath);
       const contentType = metadata?.contentType || "application/octet-stream";
       
-      const stream = await objectStorageClient.downloadAsStream(objectPath);
+      // Use downloadAsBytes for more reliable serving
+      const bytes = await objectStorageClient.downloadAsBytes(objectPath);
+      const buffer = Buffer.from(bytes);
       
       res.set({
         "Content-Type": contentType,
         "Cache-Control": `${isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
+        "Content-Length": buffer.length.toString(),
       });
 
-      stream.on("error", (err) => {
-        console.error("Stream error:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: "Error streaming file" });
-        }
-      });
-
-      stream.pipe(res);
+      res.send(buffer);
     } catch (error) {
       console.error("Error downloading file:", error);
       if (!res.headersSent) {
