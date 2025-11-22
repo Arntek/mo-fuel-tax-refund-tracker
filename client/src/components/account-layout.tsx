@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu } from "lucide-react";
+import { Upload, Settings, LogOut, Users, Car, ChevronDown, Menu, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
@@ -86,7 +86,7 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
         <div className="hidden sm:flex items-center gap-1 sm:gap-2">
           <Link href={`/dashboard/${accountId}`}>
             <Button variant="ghost" size="icon" data-testid="button-dashboard">
-              <Receipt className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
             </Button>
           </Link>
           <Link href={`/people/${accountId}`}>
@@ -127,7 +127,7 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
                     onClick={() => setMobileMenuOpen(false)}
                     data-testid="mobile-link-dashboard"
                   >
-                    <Receipt className="w-4 h-4" />
+                    <Upload className="w-4 h-4" />
                     Dashboard
                   </Button>
                 </Link>
