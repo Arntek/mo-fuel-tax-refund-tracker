@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Auth from "@/pages/auth";
 import Accounts from "@/pages/accounts";
 import Dashboard from "@/pages/dashboard";
+import Receipts from "@/pages/receipts";
 import People from "@/pages/people";
 import Vehicles from "@/pages/vehicles";
 import Settings from "@/pages/settings";
@@ -45,6 +46,11 @@ function Router() {
       <Route path="/dashboard/:accountId">
         <AuthCheck>
           <Dashboard />
+        </AuthCheck>
+      </Route>
+      <Route path="/receipts/:accountId">
+        <AuthCheck>
+          <Receipts />
         </AuthCheck>
       </Route>
       <Route path="/people/:accountId">

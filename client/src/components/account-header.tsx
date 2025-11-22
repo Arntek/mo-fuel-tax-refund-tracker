@@ -104,6 +104,11 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
               <Upload className="w-4 h-4" />
             </Link>
           </Button>
+          <Button variant="ghost" size="icon" data-testid="button-receipts" aria-label="Receipts" asChild>
+            <Link href={`/receipts/${accountId}`}>
+              <Receipt className="w-4 h-4" />
+            </Link>
+          </Button>
           <Button variant="ghost" size="icon" data-testid="button-people" aria-label="People" asChild>
             <Link href={`/people/${accountId}`}>
               <Users className="w-4 h-4" />
@@ -147,6 +152,12 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
                   <Link href={`/dashboard/${accountId}`} onClick={closeMenu}>
                     <Upload className="w-5 h-5" />
                     <span>Dashboard</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-receipts" asChild>
+                  <Link href={`/receipts/${accountId}`} onClick={closeMenu}>
+                    <Receipt className="w-5 h-5" />
+                    <span>Receipts</span>
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-people" asChild>

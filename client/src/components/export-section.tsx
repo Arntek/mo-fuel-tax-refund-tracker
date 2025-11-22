@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Receipt } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,22 @@ interface ExportSectionProps {
 }
 
 export function ExportSection({ receipts }: ExportSectionProps) {
-  const [selectedYear, setSelectedYear] = useState<string>(getCurrentFiscalYear());
   const { toast } = useToast();
 
-  const fiscalYears = Array.from(new Set(receipts.map(r => r.fiscalYear))).sort().reverse();
+  // Memoize fiscal years to prevent unnecessary recalculations
+  const fiscalYears = useMemo(() => {
+    return Array.from(new Set(receipts.map(r => r.fiscalYear))).sort().reverse();
+  }, [receipts]);
+
+  const [selectedYear, setSelectedYear] = useState<string>("");
+
+  // Initialize selected year to the first available fiscal year (most recent)
+  useEffect(() => {
+    if (fiscalYears.length > 0 && !fiscalYears.includes(selectedYear)) {
+      setSelectedYear(fiscalYears[0]);
+    }
+  }, [fiscalYears, selectedYear]);
+
   const yearReceipts = receipts.filter(r => r.fiscalYear === selectedYear);
 
   const handleExport = () => {
@@ -84,7 +96,7 @@ export function ExportSection({ receipts }: ExportSectionProps) {
               <SelectContent>
                 {fiscalYears.map((year) => (
                   <SelectItem key={year} value={year} data-testid={`option-year-${year}`}>
-                    FY {year} ({yearReceipts.filter(r => r.fiscalYear === year).length} receipts)
+                    FY {year} ({receipts.filter(r => r.fiscalYear === year).length} receipts)
                   </SelectItem>
                 ))}
               </SelectContent>

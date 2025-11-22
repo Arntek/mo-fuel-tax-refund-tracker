@@ -2,21 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { UploadZone } from "@/components/upload-zone";
-import { ReceiptTable } from "@/components/receipt-table";
-import { DashboardSummary } from "@/components/dashboard-summary";
-import { ExportSection } from "@/components/export-section";
 import { DeadlineBanner } from "@/components/deadline-banner";
 import { AccountHeader } from "@/components/account-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Car, Check } from "lucide-react";
 
-type Receipt = any;
 type Account = any;
 type Vehicle = any;
-type Member = any;
 
 export default function Dashboard() {
   const params = useParams();
@@ -26,11 +20,6 @@ export default function Dashboard() {
 
   const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
-    enabled: !!accountId,
-  });
-
-  const { data: receipts = [], isLoading: receiptsLoading } = useQuery<Receipt[]>({
-    queryKey: ["/api/accounts", accountId, "receipts"],
     enabled: !!accountId,
   });
 
@@ -55,28 +44,12 @@ export default function Dashboard() {
     localStorage.setItem(`lastVehicle_${accountId}`, vehicleId);
   };
 
-  const getCurrentFiscalYear = () => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    
-    if (currentMonth >= 7) {
-      return `${currentYear}-${currentYear + 1}`;
-    } else {
-      return `${currentYear - 1}-${currentYear}`;
-    }
-  };
-
-  const fiscalYear = receipts.length > 0 
-    ? receipts[0].fiscalYear 
-    : getCurrentFiscalYear();
-
   if (!accountId) {
     setLocation("/accounts");
     return null;
   }
 
-  if (accountLoading || vehiclesLoading || receiptsLoading) {
+  if (accountLoading || vehiclesLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -216,21 +189,6 @@ export default function Dashboard() {
             </>
           )}
         </div>
-
-        <DashboardSummary receipts={receipts} fiscalYear={fiscalYear} />
-
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Receipts</h2>
-          {receiptsLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <ReceiptTable receipts={receipts} accountId={accountId} />
-          )}
-        </div>
-
-        <ExportSection receipts={receipts} />
       </main>
     </div>
   );

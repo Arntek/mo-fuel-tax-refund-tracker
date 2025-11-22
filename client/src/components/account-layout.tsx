@@ -89,6 +89,11 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
               <Upload className="w-4 h-4" />
             </Button>
           </Link>
+          <Link href={`/receipts/${accountId}`}>
+            <Button variant="ghost" size="icon" data-testid="button-receipts">
+              <Receipt className="w-4 h-4" />
+            </Button>
+          </Link>
           <Link href={`/people/${accountId}`}>
             <Button variant="ghost" size="icon" data-testid="button-people">
               <Users className="w-4 h-4" />
@@ -127,8 +132,19 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
                     onClick={() => setMobileMenuOpen(false)}
                     data-testid="mobile-link-dashboard"
                   >
-                    <Receipt className="w-4 h-4" />
+                    <Upload className="w-4 h-4" />
                     Dashboard
+                  </Button>
+                </Link>
+                <Link href={`/receipts/${accountId}`}>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                    data-testid="mobile-link-receipts"
+                  >
+                    <Receipt className="w-4 h-4" />
+                    Receipts
                   </Button>
                 </Link>
                 <Link href={`/people/${accountId}`}>
