@@ -127,7 +127,7 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
                     onClick={() => setMobileMenuOpen(false)}
                     data-testid="mobile-link-dashboard"
                   >
-                    <Upload className="w-4 h-4" />
+                    <Receipt className="w-4 h-4" />
                     Dashboard
                   </Button>
                 </Link>
