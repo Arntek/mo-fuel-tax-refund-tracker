@@ -356,6 +356,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/accounts/:accountId/vehicles/:id", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      const vehicle = await storage.getVehicleById(id);
+      
+      if (!vehicle) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+
+      if (vehicle.accountId !== req.accountId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(vehicle);
+    } catch (error) {
+      console.error("Error getting vehicle:", error);
+      res.status(500).json({ error: "Failed to get vehicle" });
+    }
+  });
+
   app.post("/api/accounts/:accountId/vehicles", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const validated = insertVehicleSchema.parse({
