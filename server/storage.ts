@@ -54,6 +54,8 @@ export interface IStorage {
   getAccountMembers(accountId: string): Promise<(AccountMember & { user: User })[]>;
   addAccountMember(member: InsertAccountMember): Promise<AccountMember>;
   updateMemberRole(accountId: string, userId: string, role: string): Promise<AccountMember | undefined>;
+  deactivateAccountMember(accountId: string, userId: string): Promise<AccountMember | undefined>;
+  reactivateAccountMember(accountId: string, userId: string): Promise<AccountMember | undefined>;
   removeAccountMember(accountId: string, userId: string): Promise<boolean>;
   isUserAccountMember(accountId: string, userId: string): Promise<boolean>;
   getUserRole(accountId: string, userId: string): Promise<string | undefined>;
@@ -174,7 +176,7 @@ export class DbStorage implements IStorage {
       .select()
       .from(schema.accounts)
       .innerJoin(schema.accountMembers, eq(schema.accounts.id, schema.accountMembers.accountId))
-      .where(eq(schema.accountMembers.userId, userId))
+      .where(and(eq(schema.accountMembers.userId, userId), eq(schema.accountMembers.active, true)))
       .orderBy(desc(schema.accounts.createdAt));
 
     const accountsWithCounts = await Promise.all(
@@ -182,7 +184,7 @@ export class DbStorage implements IStorage {
         const members = await db
           .select()
           .from(schema.accountMembers)
-          .where(eq(schema.accountMembers.accountId, row.accounts.id));
+          .where(and(eq(schema.accountMembers.accountId, row.accounts.id), eq(schema.accountMembers.active, true)));
         return {
           ...row.accounts,
           role: row.account_members.role,
@@ -202,6 +204,7 @@ export class DbStorage implements IStorage {
         accountId: schema.accountMembers.accountId,
         userId: schema.accountMembers.userId,
         role: schema.accountMembers.role,
+        active: schema.accountMembers.active,
         createdAt: schema.accountMembers.createdAt,
         user: schema.users,
       })
@@ -226,6 +229,24 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
+  async deactivateAccountMember(accountId: string, userId: string): Promise<AccountMember | undefined> {
+    const [updated] = await db
+      .update(schema.accountMembers)
+      .set({ active: false })
+      .where(and(eq(schema.accountMembers.accountId, accountId), eq(schema.accountMembers.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async reactivateAccountMember(accountId: string, userId: string): Promise<AccountMember | undefined> {
+    const [updated] = await db
+      .update(schema.accountMembers)
+      .set({ active: true })
+      .where(and(eq(schema.accountMembers.accountId, accountId), eq(schema.accountMembers.userId, userId)))
+      .returning();
+    return updated;
+  }
+
   async removeAccountMember(accountId: string, userId: string): Promise<boolean> {
     const result = await db
       .delete(schema.accountMembers)
@@ -237,7 +258,11 @@ export class DbStorage implements IStorage {
     const [member] = await db
       .select()
       .from(schema.accountMembers)
-      .where(and(eq(schema.accountMembers.accountId, accountId), eq(schema.accountMembers.userId, userId)))
+      .where(and(
+        eq(schema.accountMembers.accountId, accountId),
+        eq(schema.accountMembers.userId, userId),
+        eq(schema.accountMembers.active, true)
+      ))
       .limit(1);
     return !!member;
   }
@@ -246,7 +271,11 @@ export class DbStorage implements IStorage {
     const [member] = await db
       .select()
       .from(schema.accountMembers)
-      .where(and(eq(schema.accountMembers.accountId, accountId), eq(schema.accountMembers.userId, userId)))
+      .where(and(
+        eq(schema.accountMembers.accountId, accountId),
+        eq(schema.accountMembers.userId, userId),
+        eq(schema.accountMembers.active, true)
+      ))
       .limit(1);
     return member?.role;
   }

@@ -9,9 +9,7 @@ import { AccountHeader } from "@/components/account-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-type Account = any;
-type Vehicle = any;
+import type { Account, Vehicle } from "@shared/schema";
 
 export default function Vehicles() {
   const params = useParams();
@@ -19,6 +17,7 @@ export default function Vehicles() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
   const [year, setYear] = useState("");
   const [make, setMake] = useState("");
@@ -75,6 +74,7 @@ export default function Vehicles() {
       return apiRequest(`/api/accounts/${accountId}/vehicles`, {
         method: "POST",
         body: JSON.stringify({
+          nickname: nickname || null,
           vin: vin || null,
           year: parseInt(year),
           make,
@@ -87,6 +87,7 @@ export default function Vehicles() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "vehicles"] });
       setShowAddForm(false);
+      setNickname("");
       setVin("");
       setYear("");
       setMake("");
@@ -108,7 +109,7 @@ export default function Vehicles() {
   });
 
   const deleteVehicleMutation = useMutation({
-    mutationFn: async (vehicleId: number) => {
+    mutationFn: async (vehicleId: string) => {
       return apiRequest(`/api/accounts/${accountId}/vehicles/${vehicleId}`, {
         method: "DELETE",
       });
@@ -196,6 +197,16 @@ export default function Vehicles() {
                 <CardDescription>Add a vehicle to track gas receipts</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nickname">Nickname (Optional)</Label>
+                  <Input
+                    id="nickname"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    placeholder="e.g., My Truck, Work Van"
+                    data-testid="input-nickname"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="vin">VIN (Optional)</Label>
                   <div className="flex gap-2">
@@ -300,28 +311,47 @@ export default function Vehicles() {
               </Card>
             ) : (
               <div className="space-y-2">
-                {vehicles.map((vehicle: any) => (
+                {vehicles.map(vehicle => (
                   <Card key={vehicle.id}>
                     <CardHeader className="py-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <CardTitle className="text-base">
-                            {vehicle.year} {vehicle.make} {vehicle.model}
+                            {vehicle.nickname ? (
+                              <>
+                                {vehicle.nickname}
+                                <span className="text-sm font-normal text-muted-foreground ml-2">
+                                  ({vehicle.year} {vehicle.make} {vehicle.model})
+                                </span>
+                              </>
+                            ) : (
+                              `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+                            )}
                           </CardTitle>
                           <CardDescription className="text-sm">
                             {vehicle.fuelType} • {vehicle.weightUnder26000 ? "Under" : "Over"} 26,000 lbs
                             {vehicle.vin && ` • VIN: ${vehicle.vin}`}
                           </CardDescription>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteVehicleMutation.mutate(vehicle.id)}
-                          disabled={deleteVehicleMutation.isPending}
-                          data-testid={`button-delete-vehicle-${vehicle.id}`}
-                        >
-                          Delete
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLocation(`/vehicles/${accountId}/edit/${vehicle.id}`)}
+                            data-testid={`button-edit-vehicle-${vehicle.id}`}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteVehicleMutation.mutate(vehicle.id)}
+                            disabled={deleteVehicleMutation.isPending}
+                            data-testid={`button-delete-vehicle-${vehicle.id}`}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                   </Card>

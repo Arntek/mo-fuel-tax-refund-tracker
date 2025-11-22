@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import Receipts from "@/pages/receipts";
 import People from "@/pages/people";
 import Vehicles from "@/pages/vehicles";
+import VehicleEdit from "@/pages/vehicle-edit";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
@@ -56,6 +57,11 @@ function Router() {
       <Route path="/people/:accountId">
         <AuthCheck>
           <People />
+        </AuthCheck>
+      </Route>
+      <Route path="/vehicles/:accountId/edit/:vehicleId">
+        <AuthCheck>
+          <VehicleEdit />
         </AuthCheck>
       </Route>
       <Route path="/vehicles/:accountId">

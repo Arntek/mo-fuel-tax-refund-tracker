@@ -9,9 +9,9 @@ import { AccountHeader } from "@/components/account-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Account, AccountMember, User } from "@shared/schema";
 
-type Account = any;
-type Member = any;
+type MemberWithUser = AccountMember & { user: User };
 
 export default function People() {
   const params = useParams();
@@ -26,7 +26,7 @@ export default function People() {
     enabled: !!accountId,
   });
 
-  const { data: members = [], isLoading: membersLoading } = useQuery<Member[]>({
+  const { data: members = [], isLoading: membersLoading } = useQuery<MemberWithUser[]>({
     queryKey: ["/api/accounts", accountId, "members"],
     enabled: !!accountId,
   });
@@ -58,8 +58,31 @@ export default function People() {
     },
   });
 
-  const removeMemberMutation = useMutation({
-    mutationFn: async (userId: number) => {
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      return apiRequest(`/api/accounts/${accountId}/members/${userId}`, {
+        method: "PUT",
+        body: JSON.stringify({ role }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "members"] });
+      toast({
+        title: "Role updated",
+        description: "The member's role has been updated",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update role",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deactivateMemberMutation = useMutation({
+    mutationFn: async (userId: string) => {
       return apiRequest(`/api/accounts/${accountId}/members/${userId}`, {
         method: "DELETE",
       });
@@ -69,14 +92,14 @@ export default function People() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       toast({
-        title: "Member removed",
-        description: "The member has been removed from the account",
+        title: "Member deactivated",
+        description: "The member has been deactivated from the account",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to remove member",
+        description: "Failed to deactivate member",
         variant: "destructive",
       });
     },
@@ -175,7 +198,7 @@ export default function People() {
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Current Members</h2>
             <div className="space-y-2">
-              {members.map((member: any) => (
+              {members.filter(member => member.active).map(member => (
                 <Card key={member.id}>
                   <CardHeader className="py-3">
                     <div className="flex items-center justify-between gap-4">
@@ -188,16 +211,32 @@ export default function People() {
                         </CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground capitalize">{member.role}</span>
+                        {member.role === "owner" ? (
+                          <span className="text-sm text-muted-foreground capitalize">{member.role}</span>
+                        ) : (
+                          <Select
+                            value={member.role}
+                            onValueChange={(newRole) => updateRoleMutation.mutate({ userId: member.userId, role: newRole })}
+                            disabled={updateRoleMutation.isPending}
+                          >
+                            <SelectTrigger className="w-32" data-testid={`select-role-${member.userId}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="member" data-testid={`option-member-${member.userId}`}>Member</SelectItem>
+                              <SelectItem value="admin" data-testid={`option-admin-${member.userId}`}>Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                         {member.role !== "owner" && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeMemberMutation.mutate(member.userId)}
-                            disabled={removeMemberMutation.isPending}
-                            data-testid={`button-remove-member-${member.userId}`}
+                            onClick={() => deactivateMemberMutation.mutate(member.userId)}
+                            disabled={deactivateMemberMutation.isPending}
+                            data-testid={`button-deactivate-member-${member.userId}`}
                           >
-                            Remove
+                            Deactivate
                           </Button>
                         )}
                       </div>

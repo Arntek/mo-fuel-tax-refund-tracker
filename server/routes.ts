@@ -330,19 +330,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const account = await storage.getAccountById(req.accountId);
       
       if (account?.ownerId === userId) {
-        return res.status(400).json({ error: "Cannot remove account owner" });
+        return res.status(400).json({ error: "Cannot deactivate account owner" });
       }
       
-      const deleted = await storage.removeAccountMember(req.accountId, userId);
+      const deactivated = await storage.deactivateAccountMember(req.accountId, userId);
       
-      if (!deleted) {
+      if (!deactivated) {
         return res.status(404).json({ error: "Member not found" });
       }
       
-      res.json({ success: true });
+      res.json(deactivated);
     } catch (error) {
-      console.error("Error removing member:", error);
-      res.status(500).json({ error: "Failed to remove member" });
+      console.error("Error deactivating member:", error);
+      res.status(500).json({ error: "Failed to deactivate member" });
     }
   });
 

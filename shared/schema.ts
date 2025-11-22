@@ -64,6 +64,7 @@ export const accountMembers = pgTable("account_members", {
   accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: varchar("role", { length: 50 }).notNull().default("member"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   accountUserIdx: index("account_member_idx").on(table.accountId, table.userId),
@@ -73,6 +74,7 @@ export const vehicles = pgTable("vehicles", {
   id: uuid("id").primaryKey().defaultRandom(),
   accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
   vin: varchar("vin", { length: 17 }),
+  nickname: varchar("nickname", { length: 100 }),
   year: integer("year").notNull(),
   make: varchar("make", { length: 100 }).notNull(),
   model: varchar("model", { length: 100 }).notNull(),

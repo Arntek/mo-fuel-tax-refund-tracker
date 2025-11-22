@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Receipt } from "@shared/schema";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Eye, Trash2, ArrowUpDown } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,13 +29,32 @@ interface ReceiptTableProps {
 type SortField = "date" | "stationName" | "gallons" | "totalAmount";
 type SortDirection = "asc" | "desc";
 
+const ITEMS_PER_PAGE_KEY = "receipts_items_per_page";
+const DEFAULT_ITEMS_PER_PAGE = 10;
+
 export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<Receipt | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
+    if (typeof window === 'undefined') return DEFAULT_ITEMS_PER_PAGE;
+    const stored = localStorage.getItem(ITEMS_PER_PAGE_KEY);
+    return stored ? parseInt(stored, 10) : DEFAULT_ITEMS_PER_PAGE;
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ITEMS_PER_PAGE_KEY, itemsPerPage.toString());
+    }
+  }, [itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [receipts.length, itemsPerPage]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -80,6 +101,16 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
     if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
     return 0;
   });
+
+  const totalPages = Math.ceil(sortedReceipts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedReceipts = sortedReceipts.slice(startIndex, endIndex);
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value, 10));
+    setCurrentPage(1);
+  };
 
   return (
     <>
@@ -136,7 +167,7 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedReceipts.map((receipt) => (
+                {paginatedReceipts.map((receipt) => (
                   <TableRow key={receipt.id} className="hover-elevate" data-testid={`row-receipt-${receipt.id}`}>
                     <TableCell>
                       <img
@@ -189,7 +220,7 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
         </div>
 
         <div className="md:hidden space-y-4">
-          {sortedReceipts.map((receipt) => (
+          {paginatedReceipts.map((receipt) => (
             <div
               key={receipt.id}
               className="border rounded-md p-4 space-y-3 hover-elevate"
@@ -260,6 +291,73 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
             </div>
           ))}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Items per page:</span>
+              <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                <SelectTrigger className="w-20" data-testid="select-items-per-page">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10" data-testid="option-10">10</SelectItem>
+                  <SelectItem value="25" data-testid="option-25">25</SelectItem>
+                  <SelectItem value="50" data-testid="option-50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                {startIndex + 1}-{Math.min(endIndex, sortedReceipts.length)} of {sortedReceipts.length}
+              </span>
+            </div>
+            
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    data-testid="button-previous-page"
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNumber: number;
+                  if (totalPages <= 5) {
+                    pageNumber = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNumber = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + i;
+                  } else {
+                    pageNumber = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(pageNumber)}
+                        isActive={currentPage === pageNumber}
+                        className="cursor-pointer"
+                        data-testid={`button-page-${pageNumber}`}
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    data-testid="button-next-page"
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
       {viewingReceipt && (
