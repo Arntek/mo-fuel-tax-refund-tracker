@@ -1,8 +1,3 @@
-// Blueprint reference: javascript_object_storage
-import { File } from "@google-cloud/storage";
-
-const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
-
 export enum ObjectAccessGroupType {}
 
 export interface ObjectAccessGroup {
@@ -24,6 +19,11 @@ export interface ObjectAclPolicy {
   owner: string;
   visibility: "public" | "private";
   aclRules?: Array<ObjectAclRule>;
+}
+
+export interface ObjectMetadata {
+  contentType?: string;
+  [key: string]: any;
 }
 
 function isPermissionAllowed(
@@ -55,43 +55,53 @@ function createObjectAccessGroup(
   }
 }
 
+// In-memory storage for ACL policies and metadata
+// Note: This is temporary storage that will be lost on server restart
+// For production, this should be moved to database storage
+const aclPolicies = new Map<string, ObjectAclPolicy>();
+const objectMetadata = new Map<string, ObjectMetadata>();
+
 export async function setObjectAclPolicy(
-  objectFile: File,
+  objectPath: string,
   aclPolicy: ObjectAclPolicy,
 ): Promise<void> {
-  const [exists] = await objectFile.exists();
-  if (!exists) {
-    throw new Error(`Object not found: ${objectFile.name}`);
-  }
-
-  await objectFile.setMetadata({
-    metadata: {
-      [ACL_POLICY_METADATA_KEY]: JSON.stringify(aclPolicy),
-    },
-  });
+  aclPolicies.set(objectPath, aclPolicy);
 }
 
 export async function getObjectAclPolicy(
-  objectFile: File,
+  objectPath: string,
 ): Promise<ObjectAclPolicy | null> {
-  const [metadata] = await objectFile.getMetadata();
-  const aclPolicy = metadata?.metadata?.[ACL_POLICY_METADATA_KEY];
-  if (!aclPolicy) {
-    return null;
-  }
-  return JSON.parse(aclPolicy as string);
+  return aclPolicies.get(objectPath) || null;
+}
+
+export async function setObjectMetadata(
+  objectPath: string,
+  metadata: ObjectMetadata,
+): Promise<void> {
+  objectMetadata.set(objectPath, metadata);
+}
+
+export async function getObjectMetadata(
+  objectPath: string,
+): Promise<ObjectMetadata | null> {
+  return objectMetadata.get(objectPath) || null;
+}
+
+export async function deleteObjectMetadata(objectPath: string): Promise<void> {
+  aclPolicies.delete(objectPath);
+  objectMetadata.delete(objectPath);
 }
 
 export async function canAccessObject({
   userId,
-  objectFile,
+  objectPath,
   requestedPermission,
 }: {
   userId?: string;
-  objectFile: File;
+  objectPath: string;
   requestedPermission: ObjectPermission;
 }): Promise<boolean> {
-  const aclPolicy = await getObjectAclPolicy(objectFile);
+  const aclPolicy = await getObjectAclPolicy(objectPath);
   if (!aclPolicy) {
     return false;
   }

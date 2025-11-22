@@ -66,8 +66,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      objectStorageService.downloadObject(objectFile, res);
+      const objectPath = await objectStorageService.getObjectEntityFile(req.path);
+      await objectStorageService.downloadObject(objectPath, res);
     } catch (error) {
       console.error("Error accessing object:", error);
       if (error instanceof ObjectNotFoundError) {
@@ -455,21 +455,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { vehicleId } = req.body;
 
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      // Upload directly to object storage using Replit SDK
+      const objectPath = await objectStorageService.uploadObject(
+        req.file.buffer,
+        req.file.mimetype
+      );
 
-      const uploadResponse = await fetch(uploadURL, {
-        method: "PUT",
-        body: req.file.buffer,
-        headers: {
-          "Content-Type": req.file.mimetype,
-        },
-      });
+      // Set ACL policy for the uploaded object
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        objectPath,
+        {
+          owner: req.userId,
+          visibility: "private",
+        }
+      );
 
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload to object storage");
-      }
-
-      const normalizedPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       const fullImageUrl = `${req.protocol}://${req.get('host')}${normalizedPath}`;
 
       const transcription = await transcribeReceipt(fullImageUrl);
