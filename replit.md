@@ -2,11 +2,33 @@
 
 ## Overview
 
-This is a web application for managing gas station receipts for Missouri Form 4923-H tax refund filing. The application enables users to upload receipt images (via camera or file upload), automatically transcribe receipt data using AI, manage receipts in a data table, and export data for tax filing purposes. The application tracks receipts by fiscal year and provides deadline reminders during the submission window (July 1 - September 30).
+This is a multi-tenant web application for managing gas station receipts for Missouri Form 4923-H tax refund filing. The application features email-based magic code authentication, account sharing with role management (owner/admin/member), vehicle tracking with VIN lookup and nicknames, and comprehensive tax form data collection. Users can upload receipt images (via camera or file upload), automatically transcribe receipt data using AI, manage receipts in a paginated data table, and export data for tax filing purposes. The application tracks receipts by fiscal year and provides deadline reminders during the submission window (July 1 - September 30).
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes (November 22, 2025)
+
+### Vehicle Management Enhancements
+- **Vehicle Nicknames**: Added optional nickname field to vehicles for user-friendly identification (e.g., "Mom's Truck" instead of "2015 Ford F-150")
+- **Vehicle Edit Page**: Created dedicated edit page at `/vehicles/:accountId/edit/:vehicleId` for updating vehicle nicknames (no modals per user preference)
+- **Enhanced Vehicle Display**: Vehicle cards now show nickname with year/make/model in parentheses, plus always display fuel type, weight class, and VIN
+
+### Member Management Improvements  
+- **Soft Deletion**: Members are now deactivated (marked inactive) rather than deleted, preserving user data and receipt submissions across accounts
+- **Active Status Filtering**: Account member lists automatically filter to show only active members
+- **Inline Role Editing**: Added Select dropdowns for changing member roles (admin/member) directly in the people management page without navigation
+
+### Receipts Table Enhancements
+- **Pagination**: Added pagination controls with 10/25/50 items per page options, default 10
+- **Persistent Preferences**: Page size preference saved to localStorage with SSR-safe guards
+- **Auto-reset**: Pagination resets to page 1 when data changes or page size is adjusted
+
+### Technical Improvements
+- **UUID Identifiers**: All IDs use UUID strings throughout (accounts, users, vehicles, receipts, members) for better scalability and security
+- **Type Safety**: Replaced `any` types with proper schema exports (Account, Vehicle, AccountMember, User) for compile-time safety
+- **SSR Compatibility**: localStorage access guarded with function-form useState initializers to prevent server-side rendering crashes
 
 ## System Architecture
 
@@ -16,9 +38,13 @@ Preferred communication style: Simple, everyday language.
 
 **UI Component Library**: Shadcn UI components built on Radix UI primitives, styled with Tailwind CSS. The design follows Fluent Design principles with a focus on data clarity and professional appearance suitable for financial/tax applications.
 
-**Routing**: Wouter for lightweight client-side routing.
+**Routing**: Wouter for lightweight client-side routing. All editing functionality uses dedicated routes and pages (no modals per user preference). Key routes include:
+- `/receipts/:accountId` - Receipt management with pagination
+- `/vehicles/:accountId` - Vehicle listing
+- `/vehicles/:accountId/edit/:vehicleId` - Vehicle nickname editing
+- `/people/:accountId` - Member management with inline role editing
 
-**State Management**: TanStack Query (React Query) for server state management, with optimistic updates and automatic refetching disabled (staleTime: Infinity) to prevent unnecessary re-renders.
+**State Management**: TanStack Query (React Query) for server state management, with optimistic updates and automatic refetching disabled (staleTime: Infinity) to prevent unnecessary re-renders. Query cache invalidation ensures UI updates after mutations.
 
 **Form Handling**: React Hook Form with Zod validation for type-safe form schemas.
 
@@ -54,14 +80,20 @@ Preferred communication style: Simple, everyday language.
 - `@neondatabase/serverless` dependency for serverless PostgreSQL connections
 - Migration directory configured at `./migrations`
 
-**Schema Design**: Single `receipts` table with:
-- UUID primary key (auto-generated)
-- Image URL (text, not null)
-- Transaction metadata (date, station name, gallons, price per gallon, total amount)
-- Fiscal year tracking (text, not null)
-- Timestamp tracking (created_at)
+**Schema Design**: Multi-tenant architecture with UUID-based identifiers:
+- **users**: User accounts with email-based authentication (UUID primary key)
+- **accounts**: Tax filing accounts with owner and tax form fields (UUID primary key)
+- **accountMembers**: Many-to-many relationship with role (owner/admin/member) and active status for soft deletion
+- **vehicles**: Per-account vehicles with optional nickname, VIN, year/make/model, fuel type, weight class (UUID primary key)
+- **receipts**: Transaction records with image URL, transcribed data, fiscal year, linked to account and vehicle (UUID primary key)
+- **sessions**: Authentication sessions with expiry tracking
+- **authCodes**: Magic code storage for email-based login
 
-**Rationale**: In-memory storage enables rapid prototyping without database setup. Drizzle ORM provides type-safe database queries with excellent TypeScript integration. PostgreSQL offers robust relational data management suitable for financial records.
+**Member Lifecycle**: Members use active/inactive status rather than hard deletion. When deactivated from an account, they remain in the system for other accounts they belong to and retain ownership of their receipt submissions.
+
+**Multi-Tenant Isolation**: Receipts stored in object storage at `.private/{accountId}/receipts/{uuid}` for proper data separation between accounts.
+
+**Rationale**: In-memory storage enables rapid prototyping without database setup. Drizzle ORM provides type-safe database queries with excellent TypeScript integration. PostgreSQL offers robust relational data management suitable for financial records. UUID identifiers provide better scalability and security than auto-increment integers.
 
 ## External Dependencies
 
