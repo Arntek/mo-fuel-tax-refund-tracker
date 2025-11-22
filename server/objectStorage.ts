@@ -100,7 +100,18 @@ export class ObjectStorageService {
   }
 
   async deleteObject(objectPath: string): Promise<void> {
-    await objectStorageClient.delete(objectPath);
+    console.log(`Attempting to delete object at path: ${objectPath}`);
+    
+    const result = await objectStorageClient.delete(objectPath);
+    console.log(`Delete result:`, result);
+    
+    if (!result.ok) {
+      console.error(`Failed to delete object: ${objectPath}`, result.error);
+      throw new Error(`Failed to delete object from storage: ${result.error}`);
+    }
+    
+    console.log(`Successfully deleted object: ${objectPath}`);
+    
     // Clean up metadata
     await deleteObjectMetadata(objectPath);
   }
