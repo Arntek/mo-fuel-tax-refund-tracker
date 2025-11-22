@@ -39,6 +39,7 @@ export const accounts = pgTable("accounts", {
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 50 }).notNull().default("family"),
   ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  totalReceiptsUploaded: integer("total_receipts_uploaded").notNull().default(0),
   businessName: varchar("business_name", { length: 255 }),
   fein: varchar("fein", { length: 20 }),
   firstName: varchar("first_name", { length: 255 }),
@@ -80,9 +81,31 @@ export const vehicles = pgTable("vehicles", {
   model: varchar("model", { length: 100 }).notNull(),
   fuelType: varchar("fuel_type", { length: 50 }).notNull(),
   weightUnder26000: boolean("weight_under_26000").notNull(),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   accountIdx: index("vehicle_account_idx").on(table.accountId),
+}));
+
+export const vehicleMembers = pgTable("vehicle_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vehicleId: uuid("vehicle_id").notNull().references(() => vehicles.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  vehicleUserIdx: index("vehicle_member_idx").on(table.vehicleId, table.userId),
+}));
+
+export const taxRates = pgTable("tax_rates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fuelType: varchar("fuel_type", { length: 50 }).notNull().default("Motor Fuel"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"),
+  baseRate: numeric("base_rate", { precision: 10, scale: 3 }).notNull(),
+  increase: numeric("increase", { precision: 10, scale: 3 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  dateIdx: index("tax_rate_date_idx").on(table.startDate, table.endDate),
 }));
 
 export const receipts = pgTable("receipts", {
@@ -134,6 +157,16 @@ export const insertVehicleSchema = createInsertSchema(vehicles).omit({
   vin: z.string().length(17, "VIN must be exactly 17 characters").optional().or(z.literal("")),
 });
 
+export const insertVehicleMemberSchema = createInsertSchema(vehicleMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaxRateSchema = createInsertSchema(taxRates).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertReceiptSchema = createInsertSchema(receipts).omit({
   id: true,
   createdAt: true,
@@ -164,6 +197,12 @@ export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 
 export type Receipt = typeof receipts.$inferSelect;
 export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
+
+export type VehicleMember = typeof vehicleMembers.$inferSelect;
+export type InsertVehicleMember = z.infer<typeof insertVehicleMemberSchema>;
+
+export type TaxRate = typeof taxRates.$inferSelect;
+export type InsertTaxRate = z.infer<typeof insertTaxRateSchema>;
 
 export const aiTranscriptionSchema = z.object({
   date: z.string(),

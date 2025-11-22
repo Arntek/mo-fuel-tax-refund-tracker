@@ -14,6 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type Receipt = any;
 type Account = any;
 
+interface ReceiptsResponse {
+  receipts: Receipt[];
+  refundTotals: Record<string, number>;
+}
+
 export default function Receipts() {
   const params = useParams();
   const accountId = params.accountId || "";
@@ -24,10 +29,13 @@ export default function Receipts() {
     enabled: !!accountId,
   });
 
-  const { data: receipts = [], isLoading: receiptsLoading } = useQuery<Receipt[]>({
+  const { data: receiptsData, isLoading: receiptsLoading } = useQuery<ReceiptsResponse>({
     queryKey: ["/api/accounts", accountId, "receipts"],
     enabled: !!accountId,
   });
+
+  const receipts = receiptsData?.receipts || [];
+  const refundTotals = receiptsData?.refundTotals || {};
 
   // Get all unique fiscal years from receipts (memoized)
   const allFiscalYears = useMemo(() => {
@@ -125,6 +133,24 @@ export default function Receipts() {
             </div>
           )}
         </div>
+
+        {/* Tax Refund Summary */}
+        {selectedFiscalYear && refundTotals[selectedFiscalYear] !== undefined && (
+          <Card data-testid="card-tax-refund-summary">
+            <CardHeader>
+              <CardTitle>Tax Refund Summary</CardTitle>
+              <CardDescription>Total refund for FY {selectedFiscalYear}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-primary" data-testid="text-refund-amount">
+                ${parseFloat(refundTotals[selectedFiscalYear].toString()).toFixed(2)}
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Based on {filteredReceipts.length} receipt{filteredReceipts.length !== 1 ? 's' : ''}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Summary Cards */}
         <DashboardSummary receipts={filteredReceipts} fiscalYear={selectedFiscalYear} />

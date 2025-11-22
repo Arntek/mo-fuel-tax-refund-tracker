@@ -1,7 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -35,6 +36,13 @@ export default function Vehicles() {
     queryKey: ["/api/accounts", accountId, "vehicles"],
     enabled: !!accountId,
   });
+
+  // Separate active and inactive vehicles
+  const { activeVehicles, inactiveVehicles } = useMemo(() => {
+    const active = vehicles.filter(v => v.active);
+    const inactive = vehicles.filter(v => !v.active);
+    return { activeVehicles: active, inactiveVehicles: inactive };
+  }, [vehicles]);
 
 
   const handleVinLookup = async () => {
@@ -301,18 +309,19 @@ export default function Vehicles() {
             </Card>
           )}
 
+          {/* Active Vehicles Section */}
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Current Vehicles</h2>
-            {vehicles.length === 0 ? (
+            <h2 className="text-xl font-semibold">Active Vehicles</h2>
+            {activeVehicles.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
-                  No vehicles added yet
+                  No active vehicles yet
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-2">
-                {vehicles.map(vehicle => (
-                  <Card key={vehicle.id}>
+                {activeVehicles.map(vehicle => (
+                  <Card key={vehicle.id} data-testid={`card-vehicle-${vehicle.id}`}>
                     <CardHeader className="py-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 min-w-0">
@@ -359,6 +368,56 @@ export default function Vehicles() {
               </div>
             )}
           </div>
+
+          {/* Inactive Vehicles Section */}
+          {inactiveVehicles.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-muted-foreground">Inactive Vehicles</h2>
+              <div className="space-y-2">
+                {inactiveVehicles.map(vehicle => (
+                  <Card key={vehicle.id} className="opacity-60" data-testid={`card-vehicle-inactive-${vehicle.id}`}>
+                    <CardHeader className="py-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-base">
+                              {vehicle.nickname ? (
+                                <>
+                                  {vehicle.nickname}
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                                    ({vehicle.year} {vehicle.make} {vehicle.model})
+                                  </span>
+                                </>
+                              ) : (
+                                `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+                              )}
+                            </CardTitle>
+                            <Badge variant="secondary" className="ml-2" data-testid={`badge-inactive-${vehicle.id}`}>
+                              Inactive
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-sm">
+                            {vehicle.fuelType} • {vehicle.weightUnder26000 ? "Under" : "Over"} 26,000 lbs
+                            {vehicle.vin && ` • VIN: ${vehicle.vin}`}
+                          </CardDescription>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLocation(`/vehicles/${accountId}/edit/${vehicle.id}`)}
+                            data-testid={`button-edit-vehicle-inactive-${vehicle.id}`}
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

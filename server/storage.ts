@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lte, gte, or, isNull, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import {
   type User,
@@ -17,6 +17,9 @@ import {
   type InsertVehicle,
   type Receipt,
   type InsertReceipt,
+  type VehicleMember,
+  type InsertVehicleMember,
+  type TaxRate,
 } from "@shared/schema";
 import ws from "ws";
 
@@ -49,6 +52,7 @@ export interface IStorage {
   updateAccount(id: string, updates: Partial<InsertAccount>): Promise<Account | undefined>;
   deleteAccount(id: string): Promise<boolean>;
   getUserAccounts(userId: string): Promise<(Account & { role: string; memberCount: number })[]>;
+  incrementReceiptCounter(accountId: string): Promise<void>;
 
   // Account member operations
   getAccountMembers(accountId: string): Promise<(AccountMember & { user: User })[]>;
@@ -62,10 +66,21 @@ export interface IStorage {
 
   // Vehicle operations
   getAccountVehicles(accountId: string): Promise<Vehicle[]>;
+  getAccountVehiclesForUser(accountId: string, userId: string, role: string): Promise<Vehicle[]>;
   getVehicleById(id: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: string, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined>;
   deleteVehicle(id: string): Promise<boolean>;
+  deactivateVehicle(id: string): Promise<Vehicle | undefined>;
+  hasVehicleReceipts(vehicleId: string): Promise<boolean>;
+  
+  // Vehicle member operations
+  getVehicleMembers(vehicleId: string): Promise<VehicleMember[]>;
+  addVehicleMember(vehicleId: string, userId: string): Promise<VehicleMember>;
+  removeVehicleMember(vehicleId: string, userId: string): Promise<boolean>;
+  
+  // Tax rate operations
+  getTaxRateByDate(date: string): Promise<TaxRate | undefined>;
 
   // Receipt operations
   getAccountReceipts(accountId: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
@@ -303,6 +318,93 @@ export class DbStorage implements IStorage {
   async deleteVehicle(id: string): Promise<boolean> {
     const result = await db.delete(schema.vehicles).where(eq(schema.vehicles.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async getAccountVehiclesForUser(accountId: string, userId: string, role: string): Promise<Vehicle[]> {
+    // Admins and owners see all vehicles
+    if (role === 'admin' || role === 'owner') {
+      return this.getAccountVehicles(accountId);
+    }
+    
+    // Members only see vehicles they're assigned to
+    const assignments = await db
+      .select({ vehicle: schema.vehicles })
+      .from(schema.vehicleMembers)
+      .innerJoin(schema.vehicles, eq(schema.vehicleMembers.vehicleId, schema.vehicles.id))
+      .where(and(
+        eq(schema.vehicleMembers.userId, userId),
+        eq(schema.vehicles.accountId, accountId)
+      ));
+    
+    return assignments.map(a => a.vehicle);
+  }
+
+  async deactivateVehicle(id: string): Promise<Vehicle | undefined> {
+    const [deactivated] = await db
+      .update(schema.vehicles)
+      .set({ active: false })
+      .where(eq(schema.vehicles.id, id))
+      .returning();
+    return deactivated;
+  }
+
+  async hasVehicleReceipts(vehicleId: string): Promise<boolean> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.receipts)
+      .where(eq(schema.receipts.vehicleId, vehicleId));
+    return result.count > 0;
+  }
+
+  // Vehicle member operations
+  async getVehicleMembers(vehicleId: string): Promise<VehicleMember[]> {
+    return db.select().from(schema.vehicleMembers).where(eq(schema.vehicleMembers.vehicleId, vehicleId));
+  }
+
+  async addVehicleMember(vehicleId: string, userId: string): Promise<VehicleMember> {
+    const [member] = await db.insert(schema.vehicleMembers).values({
+      vehicleId,
+      userId,
+    }).returning();
+    return member;
+  }
+
+  async removeVehicleMember(vehicleId: string, userId: string): Promise<boolean> {
+    const result = await db.delete(schema.vehicleMembers).where(
+      and(
+        eq(schema.vehicleMembers.vehicleId, vehicleId),
+        eq(schema.vehicleMembers.userId, userId)
+      )
+    );
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Account operations - increment receipt counter
+  async incrementReceiptCounter(accountId: string): Promise<void> {
+    await db
+      .update(schema.accounts)
+      .set({ 
+        totalReceiptsUploaded: sql`${schema.accounts.totalReceiptsUploaded} + 1`
+      })
+      .where(eq(schema.accounts.id, accountId));
+  }
+
+  // Tax rate operations
+  async getTaxRateByDate(date: string): Promise<TaxRate | undefined> {
+    const [rate] = await db
+      .select()
+      .from(schema.taxRates)
+      .where(
+        and(
+          lte(schema.taxRates.startDate, date),
+          or(
+            isNull(schema.taxRates.endDate),
+            gte(schema.taxRates.endDate, date)
+          )
+        )
+      )
+      .limit(1);
+    return rate;
   }
 
   // Receipt operations

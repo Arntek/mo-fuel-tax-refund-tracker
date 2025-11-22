@@ -139,8 +139,20 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
               />
             </div>
 
-            <div className="pt-2 text-sm text-muted-foreground">
-              <p>Fiscal Year: {receipt.fiscalYear}</p>
+            <div className="pt-2 space-y-2 text-sm text-muted-foreground border-t">
+              <p className="pt-2">
+                <span className="font-medium">Fiscal Year:</span> {receipt.fiscalYear}
+              </p>
+              {receipt.taxRate !== undefined && (
+                <p data-testid="text-tax-rate">
+                  <span className="font-medium">Tax Rate:</span> ${parseFloat(receipt.taxRate.toString()).toFixed(3)}/gal
+                </p>
+              )}
+              {receipt.taxRefund !== undefined && (
+                <p className="text-base font-semibold text-primary" data-testid="text-tax-refund">
+                  <span className="font-medium text-muted-foreground">Tax Refund:</span> ${parseFloat(receipt.taxRefund.toString()).toFixed(2)}
+                </p>
+              )}
             </div>
 
             <DialogFooter className="gap-2">

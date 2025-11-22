@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { UploadZone } from "@/components/upload-zone";
 import { DeadlineBanner } from "@/components/deadline-banner";
 import { AccountHeader } from "@/components/account-header";
+import { ReceiptModal } from "@/components/receipt-modal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,12 +12,14 @@ import { Car, Check } from "lucide-react";
 
 type Account = any;
 type Vehicle = any;
+type Receipt = any;
 
 export default function Dashboard() {
   const params = useParams();
   const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
+  const [uploadedReceipt, setUploadedReceipt] = useState<Receipt | null>(null);
 
   const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
@@ -168,7 +171,11 @@ export default function Dashboard() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <UploadZone accountId={accountId} vehicleId={selectedVehicleId} />
+                    <UploadZone 
+                      accountId={accountId} 
+                      vehicleId={selectedVehicleId}
+                      onUploadSuccess={(receipt) => setUploadedReceipt(receipt)}
+                    />
                   </CardContent>
                 </Card>
               ) : (
@@ -190,6 +197,16 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* Receipt Review Modal */}
+      {uploadedReceipt && (
+        <ReceiptModal
+          receipt={uploadedReceipt}
+          accountId={accountId}
+          open={!!uploadedReceipt}
+          onClose={() => setUploadedReceipt(null)}
+        />
+      )}
     </div>
   );
 }

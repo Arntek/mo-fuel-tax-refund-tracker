@@ -163,6 +163,7 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                       <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </TableHead>
+                  <TableHead className="text-right">Tax Refund</TableHead>
                   <TableHead className="text-right w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -191,6 +192,9 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-${receipt.id}`}>
                       ${parseFloat(receipt.totalAmount).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-primary font-semibold" data-testid={`text-refund-${receipt.id}`}>
+                      {receipt.taxRefund !== undefined ? `$${parseFloat(receipt.taxRefund.toString()).toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -262,11 +266,21 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
               </div>
               
               <div className="flex items-center justify-between pt-2 border-t">
-                <div>
-                  <div className="text-sm text-muted-foreground">Total Amount</div>
-                  <div className="text-lg font-semibold font-mono" data-testid={`text-total-mobile-${receipt.id}`}>
-                    ${parseFloat(receipt.totalAmount).toFixed(2)}
+                <div className="space-y-1">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Total Amount</div>
+                    <div className="text-lg font-semibold font-mono" data-testid={`text-total-mobile-${receipt.id}`}>
+                      ${parseFloat(receipt.totalAmount).toFixed(2)}
+                    </div>
                   </div>
+                  {receipt.taxRefund !== undefined && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Tax Refund</div>
+                      <div className="text-base font-semibold font-mono text-primary" data-testid={`text-refund-mobile-${receipt.id}`}>
+                        ${parseFloat(receipt.taxRefund.toString()).toFixed(2)}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button

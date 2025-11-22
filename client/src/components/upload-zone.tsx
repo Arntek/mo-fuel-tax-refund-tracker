@@ -5,12 +5,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Loader2 } from "lucide-react";
 
+type Receipt = any;
+
 type UploadZoneProps = {
   accountId: string;
   vehicleId: string;
+  onUploadSuccess?: (receipt: Receipt) => void;
 };
 
-export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
+export function UploadZone({ accountId, vehicleId, onUploadSuccess }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,13 +43,18 @@ export function UploadZone({ accountId, vehicleId }: UploadZoneProps) {
     onMutate: () => {
       setIsProcessing(true);
     },
-    onSuccess: () => {
+    onSuccess: (receipt: Receipt) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
       toast({
         title: "Receipt uploaded successfully",
         description: "AI transcription completed",
       });
       setIsProcessing(false);
+      
+      // Call the callback to open the modal
+      if (onUploadSuccess) {
+        onUploadSuccess(receipt);
+      }
     },
     onError: (error: Error) => {
       toast({

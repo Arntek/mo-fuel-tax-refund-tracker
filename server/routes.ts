@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { transcribeReceipt } from "./openai";
+import { calculateReceiptTaxRefund, calculateRefundByFiscalYear } from "./taxCalculations";
 import { 
   insertReceiptSchema, 
   insertUserSchema, 
@@ -348,7 +349,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/accounts/:accountId/vehicles", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
-      const vehicles = await storage.getAccountVehicles(req.accountId);
+      // Get user role for filtering
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      
+      if (!role) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Filter vehicles based on role and assignments
+      const vehicles = await storage.getAccountVehiclesForUser(req.accountId, req.userId, role);
       res.json(vehicles);
     } catch (error) {
       console.error("Error getting vehicles:", error);
@@ -412,13 +421,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/accounts/:accountId/vehicles/:id", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const id = req.params.id;
+      
+      // Check if vehicle has receipts
+      const hasReceipts = await storage.hasVehicleReceipts(id);
+      
+      if (hasReceipts) {
+        // Deactivate instead of delete if receipts exist
+        const deactivated = await storage.deactivateVehicle(id);
+        if (!deactivated) {
+          return res.status(404).json({ error: "Vehicle not found" });
+        }
+        return res.json({ success: true, deactivated: true });
+      }
+      
+      // If no receipts, proceed with deletion
       const deleted = await storage.deleteVehicle(id);
       
       if (!deleted) {
         return res.status(404).json({ error: "Vehicle not found" });
       }
       
-      res.json({ success: true });
+      res.json({ success: true, deactivated: false });
     } catch (error) {
       console.error("Error deleting vehicle:", error);
       res.status(500).json({ error: "Failed to delete vehicle" });
@@ -460,7 +483,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/accounts/:accountId/receipts", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
       const receipts = await storage.getAccountReceipts(req.accountId);
-      res.json(receipts);
+      
+      // Pre-fetch all unique tax rates once
+      const uniqueDates = Array.from(new Set(receipts.map(r => r.date)));
+      const taxRateCache = new Map<string, any>();
+      
+      for (const date of uniqueDates) {
+        const rate = await storage.getTaxRateByDate(date);
+        taxRateCache.set(date, rate || null);
+      }
+      
+      // Calculate refunds using cached tax rates
+      const receiptsWithTax = receipts.map((receipt) => {
+        const taxRate = taxRateCache.get(receipt.date);
+        
+        if (!taxRate) {
+          return {
+            ...receipt,
+            taxRefund: 0,
+            taxBaseRate: 0,
+            taxIncrease: 0,
+          };
+        }
+        
+        const gallons = parseFloat(receipt.gallons);
+        const baseRate = parseFloat(taxRate.baseRate);
+        const increase = parseFloat(taxRate.increase);
+        
+        // Validate and calculate
+        if (isNaN(gallons) || isNaN(baseRate) || isNaN(increase)) {
+          console.warn(`Invalid tax data for receipt ${receipt.id}`);
+          return {
+            ...receipt,
+            taxRefund: 0,
+            taxBaseRate: 0,
+            taxIncrease: 0,
+          };
+        }
+        
+        const refundAmount = gallons * increase;
+        
+        return {
+          ...receipt,
+          taxRefund: parseFloat(refundAmount.toFixed(2)),
+          taxBaseRate: baseRate,
+          taxIncrease: increase,
+        };
+      });
+      
+      // Calculate fiscal year totals from already-computed refunds
+      const refundByYear = new Map<string, number>();
+      for (const receipt of receiptsWithTax) {
+        const currentTotal = refundByYear.get(receipt.fiscalYear) || 0;
+        refundByYear.set(receipt.fiscalYear, currentTotal + receipt.taxRefund);
+      }
+      
+      const refundTotals = Object.fromEntries(refundByYear);
+      
+      res.json({
+        receipts: receiptsWithTax,
+        refundTotals,
+      });
     } catch (error) {
       console.error("Error getting receipts:", error);
       res.status(500).json({ error: "Failed to get receipts" });
@@ -517,6 +600,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validated = insertReceiptSchema.parse(receiptData);
       const receipt = await storage.createReceipt(validated);
+      
+      // Increment the receipt counter for the account
+      await storage.incrementReceiptCounter(req.accountId);
 
       res.json(receipt);
     } catch (error) {
