@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu } from "lucide-react";
+import { Upload, Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -101,7 +101,7 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
         <nav className="hidden md:flex items-center gap-1 sm:gap-2" aria-label="Main navigation">
           <Button variant="ghost" size="icon" data-testid="button-dashboard" aria-label="Dashboard" asChild>
             <Link href={`/dashboard/${accountId}`}>
-              <Receipt className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
             </Link>
           </Button>
           <Button variant="ghost" size="icon" data-testid="button-people" aria-label="People" asChild>
@@ -145,7 +145,7 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
               <nav id="mobile-nav" className="flex flex-col gap-4 mt-8" aria-label="Mobile navigation">
                 <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-dashboard" asChild>
                   <Link href={`/dashboard/${accountId}`} onClick={closeMenu}>
-                    <Receipt className="w-5 h-5" />
+                    <Upload className="w-5 h-5" />
                     <span>Dashboard</span>
                   </Link>
                 </Button>
