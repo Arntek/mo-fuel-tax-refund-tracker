@@ -7,7 +7,8 @@ import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, Users, Building2, ArrowRight } from "lucide-react";
+import { Receipt, Users, Building2, ArrowRight, DollarSign, FileText, Calendar, Fuel } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 export default function Auth() {
   const [, setLocation] = useLocation();
@@ -175,6 +176,21 @@ export default function Auth() {
               </Card>
             </div>
 
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="text-center pb-2">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <DollarSign className="w-6 h-6 text-primary" />
+                  <CardTitle className="text-2xl">Simple Pricing</CardTitle>
+                </div>
+                <div className="text-4xl font-bold text-primary">$12</div>
+                <CardDescription className="text-base">per fiscal year</CardDescription>
+              </CardHeader>
+              <CardContent className="text-center space-y-2">
+                <p className="text-lg font-medium text-foreground">Free 30-day trial</p>
+                <p className="text-sm text-muted-foreground">No credit card required to start</p>
+              </CardContent>
+            </Card>
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
                 size="lg" 
@@ -182,19 +198,116 @@ export default function Auth() {
                 data-testid="button-get-started"
                 className="gap-2"
               >
-                Get Started
+                Start Your Free Trial
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
 
             <div className="text-center text-sm text-muted-foreground space-y-2">
-              <p>✓ Automatic receipt transcription with AI</p>
-              <p>✓ Vehicle management and tracking</p>
-              <p>✓ Multi-user accounts with role management</p>
-              <p>✓ Secure cloud storage</p>
+              <p>Automatic receipt transcription with AI</p>
+              <p>Vehicle management and tracking</p>
+              <p>Multi-user accounts with role management</p>
+              <p>Secure cloud storage</p>
             </div>
           </div>
         </main>
+
+        <Separator />
+
+        <section className="bg-muted/30 py-12 px-4">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="text-center">
+              <h3 className="text-2xl font-bold mb-2">What is Missouri Form 4923-H?</h3>
+              <p className="text-muted-foreground">Understanding the Motor Fuel Tax Refund Program</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <FileText className="w-6 h-6 text-primary mb-2" />
+                  <CardTitle className="text-lg">The Program</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-3">
+                  <p>
+                    Missouri Form 4923-H allows residents to claim refunds on the motor fuel tax increases 
+                    that went into effect starting October 2021. The Missouri Legislature passed Senate Bill 262 
+                    in 2021, which gradually increases the state motor fuel tax over several years.
+                  </p>
+                  <p>
+                    To help offset this burden on everyday Missourians, the state created a refund program 
+                    allowing individuals to claim back the tax increase portion on fuel purchased for 
+                    personal, non-commercial use.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <Calendar className="w-6 h-6 text-primary mb-2" />
+                  <CardTitle className="text-lg">Filing Timeline</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-3">
+                  <p>
+                    The Missouri fiscal year runs from July 1 to June 30. Claims must be filed 
+                    between July 1 and September 30 following the end of the fiscal year.
+                  </p>
+                  <p>
+                    For example, for fuel purchased between July 1, 2024 and June 30, 2025, 
+                    you can file your refund claim starting July 1, 2025 through September 30, 2025.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <Fuel className="w-6 h-6 text-primary mb-2" />
+                <CardTitle className="text-lg">Tax Rate Increases & Refund Amounts</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-4">
+                <p>
+                  The base Missouri motor fuel tax was 17 cents per gallon prior to SB 262. 
+                  The law phased in increases as follows:
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="font-semibold text-foreground">Oct 2021</p>
+                    <p className="text-primary font-bold">+2.5¢/gal</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="font-semibold text-foreground">Jul 2022</p>
+                    <p className="text-primary font-bold">+5.0¢/gal</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="font-semibold text-foreground">Jul 2023</p>
+                    <p className="text-primary font-bold">+7.5¢/gal</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="font-semibold text-foreground">Jul 2024</p>
+                    <p className="text-primary font-bold">+10.0¢/gal</p>
+                  </div>
+                </div>
+                <p>
+                  <strong className="text-foreground">Example:</strong> If you purchased 1,000 gallons of fuel 
+                  during fiscal year 2024-2025 at the 10¢ increase rate, your refund would be approximately 
+                  <strong className="text-primary"> $100.00</strong>. The average Missouri driver purchases 
+                  about 500-800 gallons per year, potentially receiving <strong className="text-primary">$50-$80</strong> in refunds.
+                </p>
+              </CardContent>
+            </Card>
+
+            <div className="text-center text-sm text-muted-foreground">
+              <p>
+                Keep your gas station receipts throughout the year. This app helps you photograph, 
+                organize, and calculate your refund automatically.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <footer className="border-t py-6 px-4 text-center text-sm text-muted-foreground">
+          <p>Receipt Tracker for Missouri Form 4923-H</p>
+        </footer>
       </div>
     );
   }
