@@ -85,7 +85,7 @@ export async function verifyAuthCode(email: string, code: string): Promise<boole
   return true;
 }
 
-export async function createSession(userId: number): Promise<string> {
+export async function createSession(userId: string): Promise<string> {
   const sessionId = generateSessionId();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
@@ -98,7 +98,7 @@ export async function createSession(userId: number): Promise<string> {
   return sessionId;
 }
 
-export async function getUserFromSession(sessionId: string | undefined): Promise<number | null> {
+export async function getUserFromSession(sessionId: string | undefined): Promise<string | null> {
   if (!sessionId) {
     return null;
   }

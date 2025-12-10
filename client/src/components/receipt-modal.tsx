@@ -181,7 +181,7 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
               <Input
                 id="pricePerGallon"
                 type="number"
-                step="0.01"
+                step="0.001"
                 value={formData.pricePerGallon}
                 onChange={(e) => setFormData({ ...formData, pricePerGallon: e.target.value })}
                 required

@@ -124,7 +124,7 @@ export const receipts = pgTable("receipts", {
   processingStatus: varchar("processing_status", { length: 20 }).notNull().default("pending"),
   processingError: text("processing_error"),
   gallons: numeric("gallons", { precision: 10, scale: 3 }),
-  pricePerGallon: numeric("price_per_gallon", { precision: 10, scale: 2 }),
+  pricePerGallon: numeric("price_per_gallon", { precision: 10, scale: 3 }),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }),
   fiscalYear: text("fiscal_year").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

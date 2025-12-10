@@ -135,7 +135,7 @@ function generateCSV(receipts: Receipt[]): string {
     r.date,
     `"${r.stationName.replace(/"/g, '""')}"`,
     parseFloat(r.gallons).toFixed(3),
-    parseFloat(r.pricePerGallon).toFixed(2),
+    parseFloat(r.pricePerGallon).toFixed(3),
     parseFloat(r.totalAmount).toFixed(2),
     r.fiscalYear,
   ]);

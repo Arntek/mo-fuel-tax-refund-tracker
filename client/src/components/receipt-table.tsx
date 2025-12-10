@@ -196,7 +196,7 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                       {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? parseFloat(receipt.gallons || "0").toFixed(3) : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-price-${receipt.id}`}>
-                      {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? `$${parseFloat(receipt.pricePerGallon || "0").toFixed(2)}` : "-"}
+                      {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? `$${parseFloat(receipt.pricePerGallon || "0").toFixed(3)}` : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-${receipt.id}`}>
                       {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? `$${parseFloat(receipt.totalAmount || "0").toFixed(2)}` : "-"}
@@ -307,7 +307,7 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                     <div>
                       <div className="text-muted-foreground">Price/Gal</div>
                       <div className="font-mono" data-testid={`text-price-mobile-${receipt.id}`}>
-                        ${parseFloat(receipt.pricePerGallon || "0").toFixed(2)}
+                        ${parseFloat(receipt.pricePerGallon || "0").toFixed(3)}
                       </div>
                     </div>
                   </div>
