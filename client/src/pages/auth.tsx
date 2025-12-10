@@ -269,22 +269,27 @@ export default function Auth() {
                   The base Missouri motor fuel tax was 17 cents per gallon prior to SB 262. 
                   The law phased in increases as follows:
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
                   <div className="p-3 bg-muted rounded-md">
-                    <p className="font-semibold text-foreground">Oct 2021</p>
+                    <p className="font-semibold text-foreground text-sm">Oct 2021</p>
                     <p className="text-primary font-bold">+2.5¢/gal</p>
                   </div>
                   <div className="p-3 bg-muted rounded-md">
-                    <p className="font-semibold text-foreground">Jul 2022</p>
+                    <p className="font-semibold text-foreground text-sm">Jul 2022</p>
                     <p className="text-primary font-bold">+5.0¢/gal</p>
                   </div>
                   <div className="p-3 bg-muted rounded-md">
-                    <p className="font-semibold text-foreground">Jul 2023</p>
+                    <p className="font-semibold text-foreground text-sm">Jul 2023</p>
                     <p className="text-primary font-bold">+7.5¢/gal</p>
                   </div>
                   <div className="p-3 bg-muted rounded-md">
-                    <p className="font-semibold text-foreground">Jul 2024</p>
+                    <p className="font-semibold text-foreground text-sm">Jul 2024</p>
                     <p className="text-primary font-bold">+10.0¢/gal</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-md border-2 border-primary/30">
+                    <p className="font-semibold text-foreground text-sm">Jul 2025</p>
+                    <p className="text-primary font-bold">+12.5¢/gal</p>
+                    <p className="text-xs text-muted-foreground">Maximum</p>
                   </div>
                 </div>
                 <p>
