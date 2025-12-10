@@ -138,11 +138,10 @@ export default function Auth() {
         <header className="border-b border-border px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Receipt className="w-6 h-6 text-primary" />
-            <h1 className="text-lg font-semibold">Receipt Tracker</h1>
+            <h1 className="text-lg font-semibold">Refund Tracker</h1>
           </div>
           <ThemeToggle />
         </header>
-
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
           <div className="max-w-4xl w-full space-y-12">
             <div className="text-center space-y-4">
@@ -210,9 +209,7 @@ export default function Auth() {
             </div>
           </div>
         </main>
-
         <Separator />
-
         <section className="bg-muted/30 py-12 px-4">
           <div className="max-w-4xl mx-auto space-y-8">
             <div className="text-center">
@@ -308,7 +305,6 @@ export default function Auth() {
             </div>
           </div>
         </section>
-
         <footer className="border-t py-6 px-4 text-center text-sm text-muted-foreground">
           <p>Receipt Tracker for Missouri Form 4923-H</p>
         </footer>
