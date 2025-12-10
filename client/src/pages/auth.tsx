@@ -303,8 +303,8 @@ export default function Auth() {
 
             <div className="text-center text-sm text-muted-foreground">
               <p>
-                Keep your gas station receipts throughout the year. This app helps you photograph, 
-                organize, and calculate your refund automatically.
+                Throughout the year, use this app to photograph your gas station receipts, organize them, 
+                and automatically calculate your refund.
               </p>
             </div>
           </div>
