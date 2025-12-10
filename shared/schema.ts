@@ -120,6 +120,7 @@ export const receipts = pgTable("receipts", {
   sellerCity: text("seller_city"),
   sellerState: varchar("seller_state", { length: 2 }),
   sellerZip: varchar("seller_zip", { length: 10 }),
+  validated: boolean("validated").notNull().default(false),
   gallons: numeric("gallons", { precision: 10, scale: 3 }).notNull(),
   pricePerGallon: numeric("price_per_gallon", { precision: 10, scale: 2 }).notNull(),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),

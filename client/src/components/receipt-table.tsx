@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Eye, Trash2, ArrowUpDown } from "lucide-react";
+import { Eye, Trash2, ArrowUpDown, AlertCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -203,8 +203,13 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                           variant="ghost"
                           onClick={() => setViewingReceipt(receipt)}
                           data-testid={`button-view-${receipt.id}`}
+                          className={!receipt.validated ? "text-destructive hover:text-destructive" : ""}
                         >
-                          <Eye className="w-4 h-4" />
+                          {receipt.validated ? (
+                            <Eye className="w-4 h-4" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4" />
+                          )}
                         </Button>
                         <Button
                           size="icon"
@@ -288,9 +293,14 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                     variant="outline"
                     onClick={() => setViewingReceipt(receipt)}
                     data-testid={`button-view-mobile-${receipt.id}`}
+                    className={!receipt.validated ? "text-destructive border-destructive hover:text-destructive" : ""}
                   >
-                    <Eye className="w-4 h-4 mr-1" />
-                    View
+                    {receipt.validated ? (
+                      <Eye className="w-4 h-4 mr-1" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                    )}
+                    {receipt.validated ? "View" : "Validate"}
                   </Button>
                   <Button
                     size="sm"

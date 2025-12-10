@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface ReceiptModalProps {
   receipt: Receipt;
@@ -20,6 +20,10 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
   const [formData, setFormData] = useState({
     date: receipt.date,
     stationName: receipt.stationName,
+    sellerStreet: receipt.sellerStreet || "",
+    sellerCity: receipt.sellerCity || "",
+    sellerState: receipt.sellerState || "",
+    sellerZip: receipt.sellerZip || "",
     gallons: parseFloat(receipt.gallons).toString(),
     pricePerGallon: parseFloat(receipt.pricePerGallon).toString(),
     totalAmount: parseFloat(receipt.totalAmount).toString(),
@@ -27,9 +31,10 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isUnvalidated = !receipt.validated;
 
   const updateMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: typeof formData & { validated?: boolean }) => {
       return apiRequest(`/api/accounts/${accountId}/receipts/${receipt.id}`, {
         method: "PUT",
         body: JSON.stringify(data),
@@ -38,8 +43,8 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
       toast({
-        title: "Receipt updated",
-        description: "Changes saved successfully",
+        title: isUnvalidated ? "Receipt validated" : "Receipt updated",
+        description: isUnvalidated ? "Receipt has been verified and saved" : "Changes saved successfully",
       });
       onClose();
     },
@@ -54,14 +59,21 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateMutation.mutate(formData);
+    if (isUnvalidated) {
+      updateMutation.mutate({ ...formData, validated: true });
+    } else {
+      updateMutation.mutate(formData);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Receipt Details</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {isUnvalidated && <AlertCircle className="w-5 h-5 text-destructive" />}
+            {isUnvalidated ? "Validate Receipt" : "Receipt Details"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -77,6 +89,12 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isUnvalidated && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+                Please verify the AI-extracted details below match the receipt image.
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
               <Input
@@ -90,7 +108,7 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="stationName">Station Name</Label>
+              <Label htmlFor="stationName">Seller Name</Label>
               <Input
                 id="stationName"
                 value={formData.stationName}
@@ -98,6 +116,51 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
                 required
                 data-testid="input-edit-station"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sellerStreet">Street Address</Label>
+              <Input
+                id="sellerStreet"
+                value={formData.sellerStreet}
+                onChange={(e) => setFormData({ ...formData, sellerStreet: e.target.value })}
+                placeholder="123 Main St"
+                data-testid="input-edit-street"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                <Label htmlFor="sellerCity">City</Label>
+                <Input
+                  id="sellerCity"
+                  value={formData.sellerCity}
+                  onChange={(e) => setFormData({ ...formData, sellerCity: e.target.value })}
+                  placeholder="City"
+                  data-testid="input-edit-city"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sellerState">State</Label>
+                <Input
+                  id="sellerState"
+                  value={formData.sellerState}
+                  onChange={(e) => setFormData({ ...formData, sellerState: e.target.value.toUpperCase().slice(0, 2) })}
+                  placeholder="MO"
+                  maxLength={2}
+                  data-testid="input-edit-state"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sellerZip">ZIP</Label>
+                <Input
+                  id="sellerZip"
+                  value={formData.sellerZip}
+                  onChange={(e) => setFormData({ ...formData, sellerZip: e.target.value })}
+                  placeholder="12345"
+                  data-testid="input-edit-zip"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -168,10 +231,11 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
               <Button
                 type="submit"
                 disabled={updateMutation.isPending}
+                variant={isUnvalidated ? "default" : "default"}
                 data-testid="button-save-edit"
               >
                 {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Save Changes
+                {isUnvalidated ? "Validate" : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>

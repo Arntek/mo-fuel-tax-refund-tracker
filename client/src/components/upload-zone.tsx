@@ -43,18 +43,13 @@ export function UploadZone({ accountId, vehicleId, onUploadSuccess }: UploadZone
     onMutate: () => {
       setIsProcessing(true);
     },
-    onSuccess: (receipt: Receipt) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
       toast({
-        title: "Receipt uploaded successfully",
-        description: "AI transcription completed",
+        title: "Receipt uploaded",
+        description: "Please review and validate the receipt details",
       });
       setIsProcessing(false);
-      
-      // Call the callback to open the modal
-      if (onUploadSuccess) {
-        onUploadSuccess(receipt);
-      }
     },
     onError: (error: Error) => {
       toast({
