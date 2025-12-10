@@ -134,9 +134,9 @@ function generateCSV(receipts: Receipt[]): string {
   const rows = receipts.map(r => [
     r.date,
     `"${r.stationName.replace(/"/g, '""')}"`,
-    parseFloat(r.gallons).toFixed(3),
-    parseFloat(r.pricePerGallon).toFixed(3),
-    parseFloat(r.totalAmount).toFixed(2),
+    parseFloat(r.gallons || "0").toFixed(3),
+    parseFloat(r.pricePerGallon || "0").toFixed(3),
+    parseFloat(r.totalAmount || "0").toFixed(2),
     r.fiscalYear,
   ]);
 

@@ -16,7 +16,10 @@ interface ReceiptModalProps {
   onClose: () => void;
 }
 
+type ReceiptWithTax = Receipt & { taxRate?: number; taxRefund?: number };
+
 export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModalProps) {
+  const receiptWithTax = receipt as ReceiptWithTax;
   const [formData, setFormData] = useState({
     date: receipt.date,
     stationName: receipt.stationName,
@@ -24,9 +27,9 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
     sellerCity: receipt.sellerCity || "",
     sellerState: receipt.sellerState || "",
     sellerZip: receipt.sellerZip || "",
-    gallons: parseFloat(receipt.gallons).toString(),
-    pricePerGallon: parseFloat(receipt.pricePerGallon).toString(),
-    totalAmount: parseFloat(receipt.totalAmount).toString(),
+    gallons: parseFloat(receipt.gallons || "0").toFixed(3),
+    pricePerGallon: parseFloat(receipt.pricePerGallon || "0").toFixed(3),
+    totalAmount: parseFloat(receipt.totalAmount || "0").toFixed(2),
   });
 
   const { toast } = useToast();
@@ -206,14 +209,14 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
               <p className="pt-2">
                 <span className="font-medium">Fiscal Year:</span> {receipt.fiscalYear}
               </p>
-              {receipt.taxRate !== undefined && (
+              {receiptWithTax.taxRate !== undefined && (
                 <p data-testid="text-tax-rate">
-                  <span className="font-medium">Tax Rate:</span> ${parseFloat(receipt.taxRate.toString()).toFixed(3)}/gal
+                  <span className="font-medium">Tax Rate:</span> ${parseFloat(receiptWithTax.taxRate.toString()).toFixed(3)}/gal
                 </p>
               )}
-              {receipt.taxRefund !== undefined && (
+              {receiptWithTax.taxRefund !== undefined && (
                 <p className="text-base font-semibold text-primary" data-testid="text-tax-refund">
-                  <span className="font-medium text-muted-foreground">Tax Refund:</span> ${parseFloat(receipt.taxRefund.toString()).toFixed(2)}
+                  <span className="font-medium text-muted-foreground">Tax Refund:</span> ${parseFloat(receiptWithTax.taxRefund.toString()).toFixed(2)}
                 </p>
               )}
             </div>

@@ -16,9 +16,9 @@ export async function transcribeReceipt(imageBuffer: Buffer, mimeType: string): 
 - sellerCity: City of the gas station if visible
 - sellerState: Two-letter state abbreviation (e.g., "MO") if visible
 - sellerZip: ZIP code if visible
-- gallons: Number of gallons purchased (as a number)
-- pricePerGallon: Price per gallon (as a number)
-- totalAmount: Total amount paid (as a number)
+- gallons: Number of gallons purchased (as a number with up to 3 decimal places)
+- pricePerGallon: Price per gallon (as a number with up to 3 decimal places, e.g., 2.459)
+- totalAmount: Total amount paid (as a number with up to 2 decimal places)
 
 If you cannot find a specific field, make your best estimate based on the receipt. For address fields, only include if visible on the receipt.
 
