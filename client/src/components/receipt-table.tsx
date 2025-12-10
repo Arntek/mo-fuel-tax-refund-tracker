@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Eye, Trash2, ArrowUpDown, AlertCircle } from "lucide-react";
+import { Eye, Trash2, ArrowUpDown, AlertCircle, Loader2, XCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -21,8 +21,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+type ReceiptWithTaxRefund = Receipt & { taxRefund?: number };
+
 interface ReceiptTableProps {
-  receipts: Receipt[];
+  receipts: ReceiptWithTaxRefund[];
   accountId: string;
 }
 
@@ -36,7 +38,7 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [viewingReceipt, setViewingReceipt] = useState<Receipt | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<ReceiptWithTaxRefund | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
     if (typeof window === 'undefined') return DEFAULT_ITEMS_PER_PAGE;
@@ -89,12 +91,12 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
   };
 
   const sortedReceipts = [...receipts].sort((a, b) => {
-    let aVal: string | number = a[sortField];
-    let bVal: string | number = b[sortField];
+    let aVal: string | number = a[sortField] || "";
+    let bVal: string | number = b[sortField] || "";
 
     if (sortField === "gallons" || sortField === "totalAmount") {
-      aVal = parseFloat(aVal as string);
-      bVal = parseFloat(bVal as string);
+      aVal = parseFloat(aVal as string) || 0;
+      bVal = parseFloat(bVal as string) || 0;
     }
 
     if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
@@ -179,38 +181,58 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                       />
                     </TableCell>
                     <TableCell className="font-medium" data-testid={`text-date-${receipt.id}`}>
-                      {formatDate(receipt.date)}
+                      {receipt.processingStatus === "pending" || receipt.processingStatus === "processing" ? (
+                        <span className="text-muted-foreground">Processing...</span>
+                      ) : receipt.processingStatus === "failed" ? (
+                        <span className="text-destructive">Failed</span>
+                      ) : (
+                        formatDate(receipt.date)
+                      )}
                     </TableCell>
                     <TableCell data-testid={`text-station-${receipt.id}`}>
-                      {receipt.stationName}
+                      {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? receipt.stationName : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-gallons-${receipt.id}`}>
-                      {parseFloat(receipt.gallons).toFixed(3)}
+                      {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? parseFloat(receipt.gallons || "0").toFixed(3) : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-price-${receipt.id}`}>
-                      ${parseFloat(receipt.pricePerGallon).toFixed(2)}
+                      {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? `$${parseFloat(receipt.pricePerGallon || "0").toFixed(2)}` : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-${receipt.id}`}>
-                      ${parseFloat(receipt.totalAmount).toFixed(2)}
+                      {receipt.processingStatus === "completed" || receipt.processingStatus === undefined ? `$${parseFloat(receipt.totalAmount || "0").toFixed(2)}` : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono text-primary font-semibold" data-testid={`text-refund-${receipt.id}`}>
-                      {receipt.taxRefund !== undefined ? `$${parseFloat(receipt.taxRefund.toString()).toFixed(2)}` : '-'}
+                      {receipt.processingStatus === "completed" && receipt.taxRefund !== undefined ? `$${parseFloat(receipt.taxRefund.toString()).toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setViewingReceipt(receipt)}
-                          data-testid={`button-view-${receipt.id}`}
-                          className={!receipt.validated ? "text-destructive hover:text-destructive" : ""}
-                        >
-                          {receipt.validated ? (
-                            <Eye className="w-4 h-4" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4" />
-                          )}
-                        </Button>
+                        {receipt.processingStatus === "pending" || receipt.processingStatus === "processing" ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        ) : receipt.processingStatus === "failed" ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setViewingReceipt(receipt)}
+                            data-testid={`button-view-${receipt.id}`}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setViewingReceipt(receipt)}
+                            data-testid={`button-view-${receipt.id}`}
+                            className={!receipt.validated ? "text-destructive hover:text-destructive" : ""}
+                          >
+                            {receipt.validated ? (
+                              <Eye className="w-4 h-4" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4" />
+                            )}
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -229,91 +251,126 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
         </div>
 
         <div className="md:hidden space-y-4">
-          {paginatedReceipts.map((receipt) => (
-            <div
-              key={receipt.id}
-              className="border rounded-md p-4 space-y-3 hover-elevate"
-              data-testid={`card-receipt-${receipt.id}`}
-            >
-              <div className="flex gap-3">
-                <img
-                  src={receipt.imageUrl}
-                  alt="Receipt"
-                  className="w-20 h-20 object-cover rounded"
-                  data-testid={`img-receipt-mobile-${receipt.id}`}
-                />
-                <div className="flex-1 space-y-1">
-                  <div className="font-medium text-foreground" data-testid={`text-date-mobile-${receipt.id}`}>
-                    {formatDate(receipt.date)}
-                  </div>
-                  <div className="text-sm text-muted-foreground" data-testid={`text-station-mobile-${receipt.id}`}>
-                    {receipt.stationName}
-                  </div>
-                  <Badge variant="secondary" className="text-xs" data-testid={`badge-year-${receipt.id}`}>
-                    FY {receipt.fiscalYear}
-                  </Badge>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <div className="text-muted-foreground">Gallons</div>
-                  <div className="font-mono" data-testid={`text-gallons-mobile-${receipt.id}`}>
-                    {parseFloat(receipt.gallons).toFixed(3)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Price/Gal</div>
-                  <div className="font-mono" data-testid={`text-price-mobile-${receipt.id}`}>
-                    ${parseFloat(receipt.pricePerGallon).toFixed(2)}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="space-y-1">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Total Amount</div>
-                    <div className="text-lg font-semibold font-mono" data-testid={`text-total-mobile-${receipt.id}`}>
-                      ${parseFloat(receipt.totalAmount).toFixed(2)}
+          {paginatedReceipts.map((receipt) => {
+            const isProcessing = receipt.processingStatus === "pending" || receipt.processingStatus === "processing";
+            const isFailed = receipt.processingStatus === "failed";
+            const isComplete = receipt.processingStatus === "completed" || receipt.processingStatus === undefined;
+            
+            return (
+              <div
+                key={receipt.id}
+                className="border rounded-md p-4 space-y-3 hover-elevate"
+                data-testid={`card-receipt-${receipt.id}`}
+              >
+                <div className="flex gap-3">
+                  <img
+                    src={receipt.imageUrl}
+                    alt="Receipt"
+                    className="w-20 h-20 object-cover rounded"
+                    data-testid={`img-receipt-mobile-${receipt.id}`}
+                  />
+                  <div className="flex-1 space-y-1">
+                    <div className="font-medium text-foreground" data-testid={`text-date-mobile-${receipt.id}`}>
+                      {isProcessing ? (
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Processing...
+                        </span>
+                      ) : isFailed ? (
+                        <span className="text-destructive flex items-center gap-2">
+                          <XCircle className="w-4 h-4" />
+                          Processing Failed
+                        </span>
+                      ) : (
+                        formatDate(receipt.date)
+                      )}
                     </div>
+                    <div className="text-sm text-muted-foreground" data-testid={`text-station-mobile-${receipt.id}`}>
+                      {isComplete ? receipt.stationName : "-"}
+                    </div>
+                    {isComplete && (
+                      <Badge variant="secondary" className="text-xs" data-testid={`badge-year-${receipt.id}`}>
+                        FY {receipt.fiscalYear}
+                      </Badge>
+                    )}
                   </div>
-                  {receipt.taxRefund !== undefined && (
+                </div>
+                
+                {isComplete && (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <div className="text-sm text-muted-foreground">Tax Refund</div>
-                      <div className="text-base font-semibold font-mono text-primary" data-testid={`text-refund-mobile-${receipt.id}`}>
-                        ${parseFloat(receipt.taxRefund.toString()).toFixed(2)}
+                      <div className="text-muted-foreground">Gallons</div>
+                      <div className="font-mono" data-testid={`text-gallons-mobile-${receipt.id}`}>
+                        {parseFloat(receipt.gallons || "0").toFixed(3)}
                       </div>
                     </div>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setViewingReceipt(receipt)}
-                    data-testid={`button-view-mobile-${receipt.id}`}
-                    className={!receipt.validated ? "text-destructive border-destructive hover:text-destructive" : ""}
-                  >
-                    {receipt.validated ? (
-                      <Eye className="w-4 h-4 mr-1" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 mr-1" />
+                    <div>
+                      <div className="text-muted-foreground">Price/Gal</div>
+                      <div className="font-mono" data-testid={`text-price-mobile-${receipt.id}`}>
+                        ${parseFloat(receipt.pricePerGallon || "0").toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="space-y-1">
+                    {isComplete && (
+                      <>
+                        <div>
+                          <div className="text-sm text-muted-foreground">Total Amount</div>
+                          <div className="text-lg font-semibold font-mono" data-testid={`text-total-mobile-${receipt.id}`}>
+                            ${parseFloat(receipt.totalAmount || "0").toFixed(2)}
+                          </div>
+                        </div>
+                        {receipt.taxRefund !== undefined && (
+                          <div>
+                            <div className="text-sm text-muted-foreground">Tax Refund</div>
+                            <div className="text-base font-semibold font-mono text-primary" data-testid={`text-refund-mobile-${receipt.id}`}>
+                              ${parseFloat(receipt.taxRefund.toString()).toFixed(2)}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
-                    {receipt.validated ? "View" : "Validate"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setDeleteId(receipt.id)}
-                    data-testid={`button-delete-mobile-${receipt.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    {isFailed && (
+                      <p className="text-sm text-muted-foreground">
+                        Click view to see details or delete
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {!isProcessing && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewingReceipt(receipt)}
+                        data-testid={`button-view-mobile-${receipt.id}`}
+                        className={isFailed || !receipt.validated ? "text-destructive border-destructive hover:text-destructive" : ""}
+                      >
+                        {isFailed ? (
+                          <XCircle className="w-4 h-4 mr-1" />
+                        ) : receipt.validated ? (
+                          <Eye className="w-4 h-4 mr-1" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                        )}
+                        {isFailed ? "View" : receipt.validated ? "View" : "Validate"}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDeleteId(receipt.id)}
+                      data-testid={`button-delete-mobile-${receipt.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {totalPages > 1 && (
