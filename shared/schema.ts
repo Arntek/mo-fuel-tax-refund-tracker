@@ -121,9 +121,11 @@ export const receipts = pgTable("receipts", {
   sellerState: varchar("seller_state", { length: 2 }),
   sellerZip: varchar("seller_zip", { length: 10 }),
   validated: boolean("validated").notNull().default(false),
-  gallons: numeric("gallons", { precision: 10, scale: 3 }).notNull(),
-  pricePerGallon: numeric("price_per_gallon", { precision: 10, scale: 2 }).notNull(),
-  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
+  processingStatus: varchar("processing_status", { length: 20 }).notNull().default("pending"),
+  processingError: text("processing_error"),
+  gallons: numeric("gallons", { precision: 10, scale: 3 }),
+  pricePerGallon: numeric("price_per_gallon", { precision: 10, scale: 2 }),
+  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }),
   fiscalYear: text("fiscal_year").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
@@ -177,9 +179,11 @@ export const insertReceiptSchema = createInsertSchema(receipts).omit({
   createdAt: true,
 }).extend({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-  gallons: z.string().or(z.number()).transform(val => String(val)),
-  pricePerGallon: z.string().or(z.number()).transform(val => String(val)),
-  totalAmount: z.string().or(z.number()).transform(val => String(val)),
+  gallons: z.string().or(z.number()).transform(val => String(val)).optional(),
+  pricePerGallon: z.string().or(z.number()).transform(val => String(val)).optional(),
+  totalAmount: z.string().or(z.number()).transform(val => String(val)).optional(),
+  processingStatus: z.enum(["pending", "processing", "completed", "failed"]).optional(),
+  processingError: z.string().optional().nullable(),
 });
 
 export type User = typeof users.$inferSelect;
