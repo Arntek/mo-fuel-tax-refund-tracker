@@ -592,6 +592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageUrl: fullImageUrl,
         date: transcription.date,
         stationName: transcription.stationName,
+        sellerAddress: transcription.sellerAddress || null,
         gallons,
         pricePerGallon,
         totalAmount,

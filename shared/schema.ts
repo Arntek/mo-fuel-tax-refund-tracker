@@ -116,6 +116,7 @@ export const receipts = pgTable("receipts", {
   imageUrl: text("image_url").notNull(),
   date: text("date").notNull(),
   stationName: text("station_name").notNull(),
+  sellerAddress: text("seller_address"),
   gallons: numeric("gallons", { precision: 10, scale: 3 }).notNull(),
   pricePerGallon: numeric("price_per_gallon", { precision: 10, scale: 2 }).notNull(),
   totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
@@ -207,6 +208,7 @@ export type InsertTaxRate = z.infer<typeof insertTaxRateSchema>;
 export const aiTranscriptionSchema = z.object({
   date: z.string(),
   stationName: z.string(),
+  sellerAddress: z.string().optional(),
   gallons: z.number(),
   pricePerGallon: z.number(),
   totalAmount: z.number(),
