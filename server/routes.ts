@@ -576,20 +576,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const fullImageUrl = `${req.protocol}://${req.get('host')}${normalizedPath}`;
 
-      // Transcribe using image bytes instead of URL (OpenAI can't access our private files)
-      const transcription = await transcribeReceipt(req.file.buffer, req.file.mimetype);
-
-      const fiscalYear = getFiscalYear(transcription.date);
-
-      const gallons = normalizeNumeric(transcription.gallons);
-      const pricePerGallon = normalizeNumeric(transcription.pricePerGallon);
-      const totalAmount = normalizeNumeric(transcription.totalAmount);
-
+      // Create receipt immediately with pending status (placeholder values for required fields)
       const receiptData = {
         accountId: req.accountId,
         vehicleId: vehicleId || null,
         uploadedBy: req.userId,
         imageUrl: fullImageUrl,
+        date: new Date().toISOString().split('T')[0],
+        stationName: "Processing...",
+        fiscalYear: getFiscalYear(new Date().toISOString().split('T')[0]),
+        processingStatus: "pending" as const,
+      };
+
+      const validated = insertReceiptSchema.parse(receiptData);
+      const receipt = await storage.createReceipt(validated);
+      
+      // Increment the receipt counter for the account
+      await storage.incrementReceiptCounter(req.accountId);
+
+      // Return immediately to allow user to continue
+      res.json(receipt);
+
+      // Process AI transcription in background (after response sent)
+      processReceiptInBackground(receipt.id, req.file.buffer, req.file.mimetype);
+    } catch (error) {
+      console.error("Error uploading receipt:", error);
+      res.status(500).json({ 
+        error: "Failed to process receipt",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Background processing function
+  async function processReceiptInBackground(receiptId: string, fileBuffer: Buffer, mimeType: string) {
+    try {
+      // Update status to processing
+      await storage.updateReceipt(receiptId, { processingStatus: "processing" });
+
+      // Transcribe using AI
+      const transcription = await transcribeReceipt(fileBuffer, mimeType);
+
+      const fiscalYear = getFiscalYear(transcription.date);
+      const gallons = normalizeNumeric(transcription.gallons);
+      const pricePerGallon = normalizeNumeric(transcription.pricePerGallon);
+      const totalAmount = normalizeNumeric(transcription.totalAmount);
+
+      // Update receipt with transcribed data
+      await storage.updateReceipt(receiptId, {
         date: transcription.date,
         stationName: transcription.stationName,
         sellerStreet: transcription.sellerStreet || null,
@@ -600,23 +634,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pricePerGallon,
         totalAmount,
         fiscalYear,
-      };
+        processingStatus: "completed",
+        processingError: null,
+      });
 
-      const validated = insertReceiptSchema.parse(receiptData);
-      const receipt = await storage.createReceipt(validated);
-      
-      // Increment the receipt counter for the account
-      await storage.incrementReceiptCounter(req.accountId);
-
-      res.json(receipt);
+      console.log(`Receipt ${receiptId} processed successfully`);
     } catch (error) {
-      console.error("Error uploading receipt:", error);
-      res.status(500).json({ 
-        error: "Failed to process receipt",
-        message: error instanceof Error ? error.message : "Unknown error"
+      console.error(`Error processing receipt ${receiptId}:`, error);
+      await storage.updateReceipt(receiptId, {
+        processingStatus: "failed",
+        processingError: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  });
+  }
 
   app.put("/api/accounts/:accountId/receipts/:id", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
