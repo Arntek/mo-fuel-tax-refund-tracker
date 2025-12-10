@@ -4,6 +4,7 @@ import sgMail from "@sendgrid/mail";
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@receipttracker.com";
+const FROM_NAME = process.env.FROM_NAME;
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
@@ -32,7 +33,7 @@ export async function sendAuthCodeEmail(email: string, code: string): Promise<vo
   try {
     await sgMail.send({
       to: email,
-      from: FROM_EMAIL,
+      from: FROM_NAME ? { email: FROM_EMAIL, name: FROM_NAME } : FROM_EMAIL,
       subject: "Your Receipt Tracker Login Code",
       text: `Your login code is: ${code}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request this code, please ignore this email.`,
       html: `

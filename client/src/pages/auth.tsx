@@ -121,10 +121,11 @@ export default function Auth() {
       });
 
       setLocation("/accounts");
-    } catch (error) {
+    } catch (error: any) {
+      const message = error?.message || "Failed to create account";
       toast({
         title: "Error",
-        description: "Failed to create account",
+        description: message,
         variant: "destructive",
       });
     } finally {
