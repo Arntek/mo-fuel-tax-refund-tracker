@@ -187,7 +187,6 @@ export default function Auth() {
               </CardHeader>
               <CardContent className="text-center space-y-2">
                 <p className="text-lg font-medium text-foreground">Free 30-day trial</p>
-                <p className="text-sm text-muted-foreground">No credit card required to start</p>
               </CardContent>
             </Card>
 
