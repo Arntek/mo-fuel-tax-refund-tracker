@@ -692,6 +692,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single receipt for status polling
+  app.get("/api/accounts/:accountId/receipts/:id", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      const receipt = await storage.getReceipt(id);
+      
+      if (!receipt) {
+        return res.status(404).json({ error: "Receipt not found" });
+      }
+
+      if (receipt.accountId !== req.accountId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Calculate tax refund if the receipt is processed
+      if (receipt.processingStatus === "completed" && receipt.gallons && receipt.date) {
+        const taxInfo = await calculateReceiptTaxRefund(receipt);
+        res.json({ ...receipt, ...taxInfo });
+      } else {
+        res.json(receipt);
+      }
+    } catch (error) {
+      console.error("Error getting receipt:", error);
+      res.status(500).json({ error: "Failed to get receipt" });
+    }
+  });
+
   app.delete("/api/accounts/:accountId/receipts/:id", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
       const { id } = req.params;
