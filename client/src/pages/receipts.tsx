@@ -32,6 +32,14 @@ export default function Receipts() {
   const { data: receiptsData, isLoading: receiptsLoading } = useQuery<ReceiptsResponse>({
     queryKey: ["/api/accounts", accountId, "receipts"],
     enabled: !!accountId,
+    refetchInterval: (query) => {
+      const data = query.state.data as ReceiptsResponse | undefined;
+      if (!data?.receipts) return false;
+      const hasProcessing = data.receipts.some(
+        (r: Receipt) => r.processingStatus === "pending" || r.processingStatus === "processing"
+      );
+      return hasProcessing ? 2000 : false;
+    },
   });
 
   const receipts = receiptsData?.receipts || [];
