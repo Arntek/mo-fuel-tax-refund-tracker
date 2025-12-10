@@ -1,21 +1,29 @@
 import { useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Loader2 } from "lucide-react";
-
-type Receipt = any;
+import { Camera, Upload, Loader2, Eye, Plus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Receipt } from "@shared/schema";
 
 type UploadZoneProps = {
   accountId: string;
   vehicleId: string;
-  onUploadSuccess?: (receipt: Receipt) => void;
+  onViewReceipt?: (receipt: Receipt) => void;
 };
 
-export function UploadZone({ accountId, vehicleId, onUploadSuccess }: UploadZoneProps) {
+export function UploadZone({ accountId, vehicleId, onViewReceipt }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedReceipt, setUploadedReceipt] = useState<Receipt | null>(null);
+  const [showPostUploadDialog, setShowPostUploadDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -38,18 +46,16 @@ export function UploadZone({ accountId, vehicleId, onUploadSuccess }: UploadZone
         throw new Error(error.message || "Upload failed");
       }
       
-      return response.json();
+      return response.json() as Promise<Receipt>;
     },
     onMutate: () => {
-      setIsProcessing(true);
+      setIsUploading(true);
     },
-    onSuccess: () => {
+    onSuccess: (receipt: Receipt) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
-      toast({
-        title: "Receipt uploaded",
-        description: "Please review and validate the receipt details",
-      });
-      setIsProcessing(false);
+      setIsUploading(false);
+      setUploadedReceipt(receipt);
+      setShowPostUploadDialog(true);
     },
     onError: (error: Error) => {
       toast({
@@ -57,7 +63,7 @@ export function UploadZone({ accountId, vehicleId, onUploadSuccess }: UploadZone
         description: error.message,
         variant: "destructive",
       });
-      setIsProcessing(false);
+      setIsUploading(false);
     },
   });
 
@@ -110,81 +116,127 @@ export function UploadZone({ accountId, vehicleId, onUploadSuccess }: UploadZone
     e.target.value = "";
   };
 
+  const handleUploadAnother = () => {
+    setShowPostUploadDialog(false);
+    setUploadedReceipt(null);
+  };
+
+  const handleViewReceipt = () => {
+    setShowPostUploadDialog(false);
+    if (uploadedReceipt && onViewReceipt) {
+      onViewReceipt(uploadedReceipt);
+    }
+    setUploadedReceipt(null);
+  };
+
   return (
-    <div
-      className={`p-6 md:p-8 rounded-md border-2 border-dashed transition-all ${
-        isDragging ? "border-primary bg-accent" : "border-muted-foreground/25"
-      } ${isProcessing ? "opacity-60 pointer-events-none" : ""}`}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-    >
-      <div className="flex flex-col items-center justify-center text-center space-y-4">
-        {isProcessing ? (
-          <>
-            <Loader2 className="w-12 h-12 text-primary animate-spin" data-testid="icon-uploading" />
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-foreground">
-                Processing receipt...
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                AI is transcribing the receipt details
-              </p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
-              <Upload className="w-8 h-8 text-primary" data-testid="icon-upload" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-foreground">
-                Upload Receipt
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Drag and drop a receipt image, or click to browse
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2"
-                data-testid="button-upload"
-              >
-                <Upload className="w-4 h-4" />
-                Browse Files
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => cameraInputRef.current?.click()}
-                className="gap-2"
-                data-testid="button-camera"
-              >
-                <Camera className="w-4 h-4" />
-                Take Photo
-              </Button>
-            </div>
-          </>
-        )}
+    <>
+      <div
+        className={`p-6 md:p-8 rounded-md border-2 border-dashed transition-all ${
+          isDragging ? "border-primary bg-accent" : "border-muted-foreground/25"
+        } ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        <div className="flex flex-col items-center justify-center text-center space-y-4">
+          {isUploading ? (
+            <>
+              <Loader2 className="w-12 h-12 text-primary animate-spin" data-testid="icon-uploading" />
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Uploading receipt...
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Saving image and starting AI processing
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
+                <Upload className="w-8 h-8 text-primary" data-testid="icon-upload" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">
+                  Upload Receipt
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Drag and drop a receipt image, or click to browse
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2"
+                  data-testid="button-upload"
+                >
+                  <Upload className="w-4 h-4" />
+                  Browse Files
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="gap-2"
+                  data-testid="button-camera"
+                >
+                  <Camera className="w-4 h-4" />
+                  Take Photo
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+          data-testid="input-file"
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileSelect}
+          className="hidden"
+          data-testid="input-camera"
+        />
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
-        data-testid="input-file"
-      />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileSelect}
-        className="hidden"
-        data-testid="input-camera"
-      />
-    </div>
+      <AlertDialog open={showPostUploadDialog} onOpenChange={setShowPostUploadDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Receipt Uploaded</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your receipt has been saved and AI is processing the details in the background.
+              What would you like to do next?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleUploadAnother}
+              className="gap-2"
+              data-testid="button-upload-another"
+            >
+              <Plus className="w-4 h-4" />
+              Upload Another
+            </Button>
+            <Button
+              onClick={handleViewReceipt}
+              className="gap-2"
+              data-testid="button-view-receipt"
+            >
+              <Eye className="w-4 h-4" />
+              View Receipt
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

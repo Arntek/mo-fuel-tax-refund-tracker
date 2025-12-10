@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { UploadZone } from "@/components/upload-zone";
@@ -8,18 +8,19 @@ import { ReceiptModal } from "@/components/receipt-modal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Car, Check } from "lucide-react";
+import { Car, Check, Loader2 } from "lucide-react";
+import { Receipt } from "@shared/schema";
 
 type Account = any;
 type Vehicle = any;
-type Receipt = any;
 
 export default function Dashboard() {
   const params = useParams();
   const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
-  const [uploadedReceipt, setUploadedReceipt] = useState<Receipt | null>(null);
+  const [viewingReceiptId, setViewingReceiptId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
@@ -29,6 +30,20 @@ export default function Dashboard() {
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
     queryKey: ["/api/accounts", accountId, "vehicles"],
     enabled: !!accountId,
+  });
+
+  // Poll for the specific receipt when user clicks "View Receipt"
+  const { data: viewingReceipt, isLoading: receiptLoading } = useQuery<Receipt>({
+    queryKey: ["/api/accounts", accountId, "receipts", viewingReceiptId],
+    enabled: !!viewingReceiptId,
+    refetchInterval: (query) => {
+      const data = query.state.data as Receipt | undefined;
+      if (!data) return 1000;
+      if (data.processingStatus === "completed" || data.processingStatus === "failed") {
+        return false;
+      }
+      return 1000;
+    },
   });
 
   // Load last selected vehicle from localStorage
@@ -45,6 +60,15 @@ export default function Dashboard() {
   const handleVehicleChange = (vehicleId: string) => {
     setSelectedVehicleId(vehicleId);
     localStorage.setItem(`lastVehicle_${accountId}`, vehicleId);
+  };
+
+  const handleViewReceipt = (receipt: Receipt) => {
+    setViewingReceiptId(receipt.id);
+  };
+
+  const handleCloseModal = () => {
+    setViewingReceiptId(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
   };
 
   if (!accountId) {
@@ -87,6 +111,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const isProcessing = viewingReceipt && (viewingReceipt.processingStatus === "pending" || viewingReceipt.processingStatus === "processing");
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -174,7 +200,7 @@ export default function Dashboard() {
                     <UploadZone 
                       accountId={accountId} 
                       vehicleId={selectedVehicleId}
-                      onUploadSuccess={(receipt) => setUploadedReceipt(receipt)}
+                      onViewReceipt={handleViewReceipt}
                     />
                   </CardContent>
                 </Card>
@@ -198,16 +224,38 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Receipt Review Modal */}
-      {uploadedReceipt && (
+      {/* Processing indicator while waiting for AI */}
+      {viewingReceiptId && isProcessing && (
+        <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+          <Card className="max-w-sm w-full mx-4">
+            <CardContent className="py-8 text-center">
+              <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Processing Receipt</h3>
+              <p className="text-muted-foreground text-sm">
+                AI is extracting details from your receipt. This usually takes a few seconds...
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => setViewingReceiptId(null)} 
+                className="mt-4"
+                data-testid="button-cancel-processing"
+              >
+                Cancel
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Receipt Review Modal - only show when processing is complete */}
+      {viewingReceipt && !isProcessing && (
         <ReceiptModal
-          receipt={uploadedReceipt}
+          receipt={viewingReceipt}
           accountId={accountId}
-          open={!!uploadedReceipt}
-          onClose={() => setUploadedReceipt(null)}
+          open={!!viewingReceipt && !isProcessing}
+          onClose={handleCloseModal}
         />
       )}
     </div>
   );
 }
-
