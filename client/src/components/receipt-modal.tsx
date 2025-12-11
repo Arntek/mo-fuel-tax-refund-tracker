@@ -7,7 +7,46 @@ import { Label } from "@/components/ui/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, RotateCcw, RotateCw, ZoomIn, ZoomOut, RefreshCw } from "lucide-react";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
+
+function ZoomControls() {
+  const { zoomIn, zoomOut, resetTransform } = useControls();
+  return (
+    <div className="flex gap-1">
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        onClick={() => zoomOut()}
+        data-testid="button-zoom-out"
+        title="Zoom out"
+      >
+        <ZoomOut className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        onClick={() => zoomIn()}
+        data-testid="button-zoom-in"
+        title="Zoom in"
+      >
+        <ZoomIn className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        onClick={() => resetTransform()}
+        data-testid="button-zoom-reset"
+        title="Reset zoom"
+      >
+        <RefreshCw className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 interface ReceiptModalProps {
   receipt: Receipt;
@@ -20,6 +59,7 @@ type ReceiptWithTax = Receipt & { taxRate?: number; taxRefund?: number };
 
 export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModalProps) {
   const receiptWithTax = receipt as ReceiptWithTax;
+  const [rotation, setRotation] = useState(0);
   const [formData, setFormData] = useState({
     date: receipt.date,
     stationName: receipt.stationName,
@@ -80,15 +120,56 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
         </DialogHeader>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div className="border rounded-md overflow-hidden bg-muted">
-              <img
-                src={receipt.imageUrl}
-                alt="Receipt"
-                className="w-full h-auto"
-                data-testid="img-receipt-detail"
-              />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setRotation((r) => r - 90)}
+                  data-testid="button-rotate-left"
+                  title="Rotate left"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setRotation((r) => r + 90)}
+                  data-testid="button-rotate-right"
+                  title="Rotate right"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
+            <div className="border rounded-md overflow-hidden bg-muted h-[400px] relative">
+              <TransformWrapper
+                initialScale={1}
+                minScale={0.5}
+                maxScale={4}
+                centerOnInit
+              >
+                <div className="flex items-center justify-end gap-1 p-1 bg-background/80 absolute top-0 right-0 z-10 rounded-bl-md">
+                  <ZoomControls />
+                </div>
+                <TransformComponent
+                  wrapperStyle={{ width: "100%", height: "100%" }}
+                  contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <img
+                    src={receipt.imageUrl}
+                    alt="Receipt"
+                    className="max-w-full max-h-full object-contain"
+                    style={{ transform: `rotate(${rotation}deg)` }}
+                    data-testid="img-receipt-detail"
+                  />
+                </TransformComponent>
+              </TransformWrapper>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">Pinch or use buttons to zoom. Drag to pan.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -493,20 +493,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taxRateCache.set(date, rate || null);
       }
       
-      // Calculate refunds using cached tax rates
+      // Calculate refunds using cached tax rates - only for Missouri receipts
       const receiptsWithTax = receipts.map((receipt) => {
         const taxRate = taxRateCache.get(receipt.date);
         
-        if (!taxRate) {
+        // Only Missouri purchases are eligible for refund
+        const isMissouri = receipt.sellerState?.toUpperCase() === "MO";
+        
+        if (!taxRate || !isMissouri) {
           return {
             ...receipt,
             taxRefund: 0,
             taxBaseRate: 0,
             taxIncrease: 0,
+            eligible: isMissouri,
           };
         }
         
-        const gallons = parseFloat(receipt.gallons);
+        const gallons = parseFloat(receipt.gallons || "0");
         const baseRate = parseFloat(taxRate.baseRate);
         const increase = parseFloat(taxRate.increase);
         
@@ -518,6 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             taxRefund: 0,
             taxBaseRate: 0,
             taxIncrease: 0,
+            eligible: true,
           };
         }
         
@@ -528,12 +533,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           taxRefund: parseFloat(refundAmount.toFixed(2)),
           taxBaseRate: baseRate,
           taxIncrease: increase,
+          eligible: true,
         };
       });
       
-      // Calculate fiscal year totals from already-computed refunds
+      // Calculate fiscal year totals from already-computed refunds (only eligible receipts)
       const refundByYear = new Map<string, number>();
       for (const receipt of receiptsWithTax) {
+        if (!receipt.eligible) continue;
         const currentTotal = refundByYear.get(receipt.fiscalYear) || 0;
         refundByYear.set(receipt.fiscalYear, currentTotal + receipt.taxRefund);
       }

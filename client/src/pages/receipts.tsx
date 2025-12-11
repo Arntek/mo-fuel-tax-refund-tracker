@@ -70,6 +70,17 @@ export default function Receipts() {
     ? receipts.filter((r: Receipt) => r.fiscalYear === selectedFiscalYear)
     : receipts;
 
+  // Separate eligible (Missouri) and ineligible (other states) receipts
+  const eligibleReceipts = filteredReceipts.filter((r: Receipt) => 
+    r.sellerState?.toUpperCase() === "MO"
+  );
+  const ineligibleReceipts = filteredReceipts.filter((r: Receipt) => 
+    r.sellerState && r.sellerState.toUpperCase() !== "MO"
+  );
+  const unclassifiedReceipts = filteredReceipts.filter((r: Receipt) => 
+    !r.sellerState
+  );
+
   if (!accountId) {
     setLocation("/accounts");
     return null;
@@ -142,41 +153,42 @@ export default function Receipts() {
           )}
         </div>
 
-        {/* Tax Refund Summary */}
-        {selectedFiscalYear && refundTotals[selectedFiscalYear] !== undefined && (
+        {/* Tax Refund Summary - Only for eligible MO receipts */}
+        {selectedFiscalYear && refundTotals[selectedFiscalYear] !== undefined && eligibleReceipts.length > 0 && (
           <Card data-testid="card-tax-refund-summary">
             <CardHeader>
               <CardTitle>Tax Refund Summary</CardTitle>
-              <CardDescription>Total refund for FY {selectedFiscalYear}</CardDescription>
+              <CardDescription>Total refund for FY {selectedFiscalYear} (Missouri purchases only)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-primary" data-testid="text-refund-amount">
                 ${parseFloat(refundTotals[selectedFiscalYear].toString()).toFixed(2)}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                Based on {filteredReceipts.length} receipt{filteredReceipts.length !== 1 ? 's' : ''}
+                Based on {eligibleReceipts.length} eligible receipt{eligibleReceipts.length !== 1 ? 's' : ''}
               </p>
             </CardContent>
           </Card>
         )}
 
-        {/* Summary Cards */}
-        <DashboardSummary receipts={filteredReceipts} fiscalYear={selectedFiscalYear} />
+        {/* Summary Cards - Only for eligible receipts */}
+        <DashboardSummary receipts={eligibleReceipts} fiscalYear={selectedFiscalYear} />
 
-        {/* Receipt Table */}
+        {/* Eligible Receipts (Missouri) */}
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold">All Receipts</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-semibold">Eligible Receipts</h3>
+            <span className="text-sm text-muted-foreground">(Missouri purchases)</span>
+          </div>
           {receiptsLoading ? (
             <div className="text-center py-12">
               <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : filteredReceipts.length === 0 ? (
+          ) : eligibleReceipts.length === 0 ? (
             <Card>
-              <CardContent className="py-12 text-center">
+              <CardContent className="py-8 text-center">
                 <p className="text-muted-foreground">
-                  {selectedFiscalYear 
-                    ? `No receipts found for fiscal year ${selectedFiscalYear}.`
-                    : "No receipts uploaded yet. Upload your first receipt to get started."}
+                  No eligible Missouri receipts found{selectedFiscalYear ? ` for fiscal year ${selectedFiscalYear}` : ""}.
                 </p>
                 <Button asChild className="mt-4" data-testid="button-upload-receipt">
                   <Link href={`/dashboard/${accountId}`}>
@@ -186,9 +198,45 @@ export default function Receipts() {
               </CardContent>
             </Card>
           ) : (
-            <ReceiptTable receipts={filteredReceipts} accountId={accountId} />
+            <ReceiptTable receipts={eligibleReceipts} accountId={accountId} />
           )}
         </div>
+
+        {/* Unclassified Receipts (missing state) */}
+        {unclassifiedReceipts.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-400">Needs Review</h3>
+              <span className="text-sm text-muted-foreground">(State not specified)</span>
+            </div>
+            <Card className="border-amber-200 dark:border-amber-800">
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  These receipts need the seller state to be added to determine refund eligibility.
+                </p>
+                <ReceiptTable receipts={unclassifiedReceipts} accountId={accountId} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Ineligible Receipts (other states) */}
+        {ineligibleReceipts.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-muted-foreground">Ineligible Receipts</h3>
+              <span className="text-sm text-muted-foreground">(Out-of-state purchases)</span>
+            </div>
+            <Card className="border-muted">
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Only fuel purchased in Missouri qualifies for Form 4923-H tax refunds.
+                </p>
+                <ReceiptTable receipts={ineligibleReceipts} accountId={accountId} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Export Section */}
         <ExportSection receipts={receipts} />
