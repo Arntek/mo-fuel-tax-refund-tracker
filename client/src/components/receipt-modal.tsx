@@ -179,6 +179,12 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
               </div>
             )}
 
+            {receipt.processingError && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-md text-sm text-amber-700 dark:text-amber-400">
+                <strong>Note:</strong> {receipt.processingError}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
               <Input

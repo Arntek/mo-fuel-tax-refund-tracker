@@ -624,25 +624,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Transcribe using AI
       const transcription = await transcribeReceipt(fileBuffer, mimeType);
 
-      const fiscalYear = getFiscalYear(transcription.date);
-      const gallons = normalizeNumeric(transcription.gallons);
-      const pricePerGallon = normalizeNumeric(transcription.pricePerGallon);
-      const totalAmount = normalizeNumeric(transcription.totalAmount);
+      // Handle nullable date - use today's date as fallback if AI couldn't read the date
+      const extractedDate = transcription.date || new Date().toISOString().split('T')[0];
+      const fiscalYear = getFiscalYear(extractedDate);
+      const gallons = normalizeNumeric(transcription.gallons) ?? undefined;
+      const pricePerGallon = normalizeNumeric(transcription.pricePerGallon) ?? undefined;
+      const totalAmount = normalizeNumeric(transcription.totalAmount) ?? undefined;
 
       // Update receipt with transcribed data
       await storage.updateReceipt(receiptId, {
-        date: transcription.date,
+        date: extractedDate,
         stationName: transcription.stationName,
-        sellerStreet: transcription.sellerStreet || null,
-        sellerCity: transcription.sellerCity || null,
-        sellerState: transcription.sellerState || null,
-        sellerZip: transcription.sellerZip || null,
+        sellerStreet: transcription.sellerStreet ?? undefined,
+        sellerCity: transcription.sellerCity ?? undefined,
+        sellerState: transcription.sellerState ?? undefined,
+        sellerZip: transcription.sellerZip ?? undefined,
         gallons,
         pricePerGallon,
         totalAmount,
         fiscalYear,
         processingStatus: "completed",
-        processingError: null,
+        processingError: transcription.date ? null : "Date could not be read - please verify",
       });
 
       console.log(`Receipt ${receiptId} processed successfully`);
@@ -777,11 +779,14 @@ function getFiscalYear(dateStr: string): string {
   }
 }
 
-function normalizeNumeric(value: string | number): string {
+function normalizeNumeric(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
   const str = String(value).replace(/[$,]/g, "");
   const num = parseFloat(str);
   if (isNaN(num)) {
-    throw new Error(`Invalid numeric value: ${value}`);
+    return null;
   }
   return num.toString();
 }

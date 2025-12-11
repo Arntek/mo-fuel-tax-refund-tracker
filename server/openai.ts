@@ -9,8 +9,10 @@ const openai = new OpenAI({
 });
 
 export async function transcribeReceipt(imageBuffer: Buffer, mimeType: string): Promise<AiTranscription> {
-  const prompt = `You are analyzing a gas station receipt image. Extract the following information and return ONLY a valid JSON object with these exact fields:
-- date: Transaction date in YYYY-MM-DD format
+  const prompt = `You are analyzing a US gas station receipt image. Extract the following information and return ONLY a valid JSON object with these exact fields:
+
+FIELDS TO EXTRACT:
+- date: Transaction date in YYYY-MM-DD format (see DATE PARSING below)
 - stationName: Name of the gas station (seller name)
 - sellerStreet: Street address of the gas station if visible
 - sellerCity: City of the gas station if visible
@@ -20,7 +22,33 @@ export async function transcribeReceipt(imageBuffer: Buffer, mimeType: string): 
 - pricePerGallon: Price per gallon (as a number with up to 3 decimal places, e.g., 2.459)
 - totalAmount: Total amount paid (as a number with up to 2 decimal places)
 
-If you cannot find a specific field, make your best estimate based on the receipt. For address fields, only include if visible on the receipt.
+DATE PARSING (CRITICAL - these are US receipts):
+All receipts are from the United States. Dates on US receipts typically use these formats:
+- mm/dd/yy (MOST COMMON, e.g., "12/11/25" = December 11, 2025)
+- mm/dd/yyyy (e.g., "12/11/2025" = December 11, 2025)
+- mm-dd-yy or mm-dd-yyyy
+- Written month (e.g., "Dec 11, 2025" or "December 11 2025")
+
+IMPORTANT: The FIRST number is always the MONTH in US date formats.
+- "03/15/25" → 2025-03-15 (March 15, 2025)
+- "11/05/24" → 2024-11-05 (November 5, 2024)
+- "01/31/25" → 2025-01-31 (January 31, 2025)
+
+Context clues for ambiguous dates:
+- If the first number is > 12, something is wrong - re-examine the receipt
+- Two-digit years: 00-30 = 2000-2030, 31-99 = 1931-1999
+- Look for time stamps near the date for confirmation
+
+Examples of date parsing:
+- "12/11/25" on receipt → return "2025-12-11" (December 11, 2025)
+- "Mar 5, 2025" on receipt → return "2025-03-05" (March 5, 2025)
+- "3-15-24" on receipt → return "2024-03-15" (March 15, 2024)
+- Date is illegible or cut off → return null for the date field
+
+CONFIDENCE RULES:
+- For the DATE field: If you cannot clearly read the date or are unsure about the format, return null. Do NOT guess.
+- For numeric fields (gallons, pricePerGallon, totalAmount): If partially visible, make your best estimate based on what's readable.
+- For address fields: Only include if clearly visible on the receipt, otherwise omit or return null.
 
 Return ONLY the JSON object, no additional text or explanation.`;
 

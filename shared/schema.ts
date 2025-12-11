@@ -214,15 +214,15 @@ export type TaxRate = typeof taxRates.$inferSelect;
 export type InsertTaxRate = z.infer<typeof insertTaxRateSchema>;
 
 export const aiTranscriptionSchema = z.object({
-  date: z.string(),
+  date: z.string().nullable(),
   stationName: z.string(),
-  sellerStreet: z.string().optional(),
-  sellerCity: z.string().optional(),
-  sellerState: z.string().optional(),
-  sellerZip: z.string().optional(),
-  gallons: z.number(),
-  pricePerGallon: z.number(),
-  totalAmount: z.number(),
+  sellerStreet: z.string().optional().nullable(),
+  sellerCity: z.string().optional().nullable(),
+  sellerState: z.string().optional().nullable(),
+  sellerZip: z.string().optional().nullable(),
+  gallons: z.number().nullable(),
+  pricePerGallon: z.number().nullable(),
+  totalAmount: z.number().nullable(),
 });
 
 export type AiTranscription = z.infer<typeof aiTranscriptionSchema>;
