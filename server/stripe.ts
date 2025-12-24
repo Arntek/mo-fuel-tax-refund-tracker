@@ -169,10 +169,14 @@ export async function createBillingPortalSession(userId: string, returnUrl: stri
 }
 
 export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
+  console.log(`[Stripe Webhook] Processing event: ${event.type}`);
+  
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const { accountId, fiscalYear } = session.metadata || {};
+      
+      console.log(`[Stripe Webhook] checkout.session.completed - accountId: ${accountId}, fiscalYear: ${fiscalYear}`);
 
       if (accountId && fiscalYear) {
         const existingSub = await db.select().from(accountSubscriptions)
@@ -181,28 +185,36 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             eq(accountSubscriptions.fiscalYear, fiscalYear)
           ));
 
+        const now = new Date();
+        const subscriptionData = {
+          status: "active" as const,
+          stripeCustomerId: session.customer as string,
+          stripePaymentIntentId: session.payment_intent as string,
+          stripeCheckoutSessionId: session.id,
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
+          paidAt: now,
+        };
+
         if (existingSub.length > 0) {
+          console.log(`[Stripe Webhook] Updating existing subscription for account ${accountId}`);
           await db.update(accountSubscriptions)
-            .set({
-              status: "active",
-              stripeCustomerId: session.customer as string,
-              currentPeriodStart: new Date(),
-              currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            })
+            .set(subscriptionData)
             .where(and(
               eq(accountSubscriptions.accountId, accountId),
               eq(accountSubscriptions.fiscalYear, fiscalYear)
             ));
         } else {
+          console.log(`[Stripe Webhook] Creating new subscription for account ${accountId}`);
           await db.insert(accountSubscriptions).values({
             accountId,
             fiscalYear,
-            status: "active",
-            stripeCustomerId: session.customer as string,
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            ...subscriptionData,
           });
         }
+        console.log(`[Stripe Webhook] Subscription activated for account ${accountId}, fiscal year ${fiscalYear}`);
+      } else {
+        console.warn(`[Stripe Webhook] Missing metadata - accountId: ${accountId}, fiscalYear: ${fiscalYear}`);
       }
       break;
     }

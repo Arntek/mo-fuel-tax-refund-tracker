@@ -157,8 +157,11 @@ export const accountSubscriptions = pgTable("account_subscriptions", {
   receiptCount: integer("receipt_count").notNull().default(0),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
+  paidAt: timestamp("paid_at"),
   canceledAt: timestamp("canceled_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
