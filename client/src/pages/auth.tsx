@@ -194,6 +194,16 @@ export default function Auth() {
               <Button 
                 size="lg" 
                 onClick={() => setStep("email")}
+                data-testid="button-login"
+                className="gap-2"
+              >
+                Login
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={() => setStep("email")}
                 data-testid="button-get-started"
                 className="gap-2"
               >
