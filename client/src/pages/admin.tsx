@@ -9,12 +9,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Plus, DollarSign, Users, Calendar, Receipt, Loader2, ShieldCheck } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { 
+  ArrowLeft, 
+  Plus, 
+  DollarSign, 
+  Users, 
+  Calendar, 
+  Receipt, 
+  Loader2, 
+  ShieldCheck, 
+  Search,
+  CreditCard,
+  TrendingUp,
+  RotateCcw,
+  CheckCircle,
+  Clock,
+  Building2
+} from "lucide-react";
 import type { User, FiscalYearPlan } from "@shared/schema";
+import { format } from "date-fns";
 
 type UserWithStats = User & {
   totalReceipts: number;
@@ -22,15 +39,35 @@ type UserWithStats = User & {
   accountCount: number;
 };
 
+type AdminStats = {
+  totalRevenue: number;
+  paidAccounts: number;
+  trialAccounts: number;
+  totalAccounts: number;
+};
+
+type AdminAccount = {
+  id: string;
+  name: string;
+  ownerName: string;
+  ownerEmail: string;
+  fiscalYear: string;
+  status: string;
+  paidAt: string | null;
+  stripePaymentIntentId: string | null;
+  receiptCount: number;
+};
+
 export default function Admin() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [newPlan, setNewPlan] = useState({
     fiscalYear: "",
     name: "",
     description: "",
     priceInCents: 1200,
   });
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -42,6 +79,35 @@ export default function Admin() {
 
   const { data: users = [], isLoading: usersLoading } = useQuery<UserWithStats[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
+    queryKey: ["/api/admin/stats", selectedFiscalYear],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedFiscalYear && selectedFiscalYear !== "all") {
+        params.set("fiscalYear", selectedFiscalYear);
+      }
+      const res = await fetch(`/api/admin/stats?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    },
+  });
+
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery<AdminAccount[]>({
+    queryKey: ["/api/admin/accounts", selectedFiscalYear, searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedFiscalYear && selectedFiscalYear !== "all") {
+        params.set("fiscalYear", selectedFiscalYear);
+      }
+      if (searchQuery) {
+        params.set("search", searchQuery);
+      }
+      const res = await fetch(`/api/admin/accounts?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch accounts");
+      return res.json();
+    },
   });
 
   const createPlanMutation = useMutation({
@@ -77,6 +143,23 @@ export default function Admin() {
     },
   });
 
+  const refundMutation = useMutation({
+    mutationFn: async (paymentIntentId: string) => {
+      return apiRequest(`/api/admin/payments/${paymentIntentId}/refund`, {
+        method: "POST",
+        body: JSON.stringify({ reason: "Admin initiated refund" }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Refunded", description: "Payment has been refunded" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to process refund", variant: "destructive" });
+    },
+  });
+
   const handleCreatePlan = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlan.fiscalYear || !newPlan.name) {
@@ -84,6 +167,12 @@ export default function Admin() {
       return;
     }
     createPlanMutation.mutate(newPlan);
+  };
+
+  const handleRefund = (paymentIntentId: string, accountName: string) => {
+    if (confirm(`Are you sure you want to refund the payment for "${accountName}"? This action cannot be undone.`)) {
+      refundMutation.mutate(paymentIntentId);
+    }
   };
 
   if (!user?.isAdmin) {
@@ -127,11 +216,19 @@ export default function Admin() {
       </header>
 
       <main className="container max-w-6xl mx-auto py-8 px-4">
-        <Tabs defaultValue="plans" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-4">
+            <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
+              <TrendingUp className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-2" data-testid="tab-payments">
+              <CreditCard className="w-4 h-4" />
+              Payments
+            </TabsTrigger>
             <TabsTrigger value="plans" className="gap-2" data-testid="tab-plans">
               <Calendar className="w-4 h-4" />
-              Fiscal Year Plans
+              Plans
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
               <Users className="w-4 h-4" />
@@ -139,6 +236,214 @@ export default function Admin() {
             </TabsTrigger>
           </TabsList>
 
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <Select value={selectedFiscalYear} onValueChange={setSelectedFiscalYear}>
+                <SelectTrigger className="w-[200px]" data-testid="select-fiscal-year-overview">
+                  <SelectValue placeholder="All Fiscal Years" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Fiscal Years</SelectItem>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.fiscalYear} value={plan.fiscalYear}>
+                      FY {plan.fiscalYear}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-total-revenue">
+                      ${((stats?.totalRevenue || 0) / 100).toFixed(2)}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    From paid subscriptions
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Paid Accounts</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-paid-accounts">
+                      {stats?.paidAccounts || 0}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Active subscriptions
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Trial Accounts</CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-trial-accounts">
+                      {stats?.trialAccounts || 0}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    In trial period
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-total-accounts">
+                      {stats?.totalAccounts || 0}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    All registered accounts
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Management</CardTitle>
+                <CardDescription>
+                  View and manage account payments. Filter by fiscal year or search by name/email.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <Select value={selectedFiscalYear} onValueChange={setSelectedFiscalYear}>
+                    <SelectTrigger className="w-[200px]" data-testid="select-fiscal-year-payments">
+                      <SelectValue placeholder="All Fiscal Years" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Fiscal Years</SelectItem>
+                      {plans.map((plan) => (
+                        <SelectItem key={plan.fiscalYear} value={plan.fiscalYear}>
+                          FY {plan.fiscalYear}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="relative flex-1 min-w-[200px] max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-search-accounts"
+                    />
+                  </div>
+                </div>
+
+                {accountsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : accounts.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No accounts found matching your criteria.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Fiscal Year</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Paid Date</TableHead>
+                        <TableHead className="text-center">Receipts</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {accounts.map((account, idx) => (
+                        <TableRow key={`${account.id}-${account.fiscalYear}-${idx}`} data-testid={`row-account-${account.id}`}>
+                          <TableCell className="font-medium">{account.name}</TableCell>
+                          <TableCell>
+                            <div>{account.ownerName}</div>
+                            <div className="text-xs text-muted-foreground">{account.ownerEmail}</div>
+                          </TableCell>
+                          <TableCell>{account.fiscalYear}</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              account.status === "active" ? "default" :
+                              account.status === "trial" ? "secondary" :
+                              "outline"
+                            }>
+                              {account.status === "active" ? "Paid" :
+                               account.status === "trial" ? "Trial" :
+                               account.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {account.paidAt ? format(new Date(account.paidAt), "MMM d, yyyy") : "-"}
+                          </TableCell>
+                          <TableCell className="text-center">{account.receiptCount}</TableCell>
+                          <TableCell className="text-right">
+                            {account.stripePaymentIntentId && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleRefund(account.stripePaymentIntentId!, account.name)}
+                                disabled={refundMutation.isPending}
+                                data-testid={`button-refund-${account.id}`}
+                              >
+                                {refundMutation.isPending ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="w-3 h-3" />
+                                )}
+                                Refund
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Plans Tab */}
           <TabsContent value="plans" className="space-y-6">
             <Card>
               <CardHeader>
@@ -204,7 +509,7 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle>Existing Plans</CardTitle>
                 <CardDescription>
-                  Manage fiscal year plans and their Stripe configurations.
+                  Manage fiscal year plans and their pricing.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -224,7 +529,6 @@ export default function Admin() {
                         <TableHead>Name</TableHead>
                         <TableHead>Price</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Stripe Price ID</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -238,9 +542,6 @@ export default function Admin() {
                               {plan.active ? "Active" : "Inactive"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {plan.stripePriceId || "Not set"}
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -250,6 +551,7 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
+          {/* Users Tab */}
           <TabsContent value="users" className="space-y-6">
             <Card>
               <CardHeader>

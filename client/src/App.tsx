@@ -14,6 +14,9 @@ import VehicleEdit from "@/pages/vehicle-edit";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
 import Billing from "@/pages/billing";
+import Privacy from "@/pages/privacy";
+import Security from "@/pages/security";
+import Cookies from "@/pages/cookies";
 import NotFound from "@/pages/not-found";
 
 function AuthCheck({ children }: { children: React.ReactNode }) {
@@ -86,6 +89,9 @@ function Router() {
           <Billing />
         </AuthCheck>
       </Route>
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/security" component={Security} />
+      <Route path="/cookies" component={Cookies} />
       <Route component={NotFound} />
     </Switch>
   );

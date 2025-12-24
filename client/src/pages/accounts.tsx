@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Footer } from "@/components/footer";
 import { Receipt, Users, ChevronRight, LogOut, Plus, ShieldCheck } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -251,6 +252,7 @@ export default function Accounts() {
           </Dialog>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

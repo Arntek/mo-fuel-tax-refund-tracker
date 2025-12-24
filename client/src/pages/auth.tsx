@@ -7,6 +7,7 @@ import { Card, CardHeader, CardContent, CardDescription, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Footer } from "@/components/footer";
 import { Receipt, Users, Building2, ArrowRight, DollarSign, FileText, Calendar, Fuel } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -327,9 +328,7 @@ export default function Auth() {
             </div>
           </div>
         </section>
-        <footer className="border-t py-6 px-4 text-center text-sm text-muted-foreground">
-          <p>Receipt Tracker for Missouri Form 4923-H</p>
-        </footer>
+        <Footer />
       </div>
     );
   }
