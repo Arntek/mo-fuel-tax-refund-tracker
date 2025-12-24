@@ -969,7 +969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const returnUrl = `${baseUrl}/dashboard/${req.accountId}`;
+      const returnUrl = `${baseUrl}/billing/${req.accountId}`;
 
       const portalUrl = await stripeService.createBillingPortalSession(req.userId, returnUrl);
       res.json({ url: portalUrl });
