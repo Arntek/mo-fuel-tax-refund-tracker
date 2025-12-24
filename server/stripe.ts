@@ -152,16 +152,6 @@ export async function createCheckoutSession(
     },
     success_url: successUrl,
     cancel_url: cancelUrl,
-    invoice_creation: {
-      enabled: true,
-      invoice_data: {
-        description: `Missouri Form 4923-H Tax Refund Subscription - Fiscal Year ${fiscalYear}`,
-        metadata: {
-          accountId,
-          fiscalYear,
-        },
-      },
-    },
   });
 
   return session.url || "";
