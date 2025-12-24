@@ -114,13 +114,6 @@ export default function Accounts() {
           <h1 className="text-lg font-semibold">Receipt Tracker</h1>
         </div>
         <div className="flex items-center gap-2">
-          {user?.isAdmin && (
-            <Button variant="ghost" size="icon" asChild data-testid="button-admin">
-              <Link href="/admin">
-                <ShieldCheck className="w-4 h-4" />
-              </Link>
-            </Button>
-          )}
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
             <LogOut className="w-4 h-4" />
@@ -138,6 +131,31 @@ export default function Accounts() {
           </div>
 
           <div className="space-y-3">
+            {user?.isAdmin && (
+              <Card
+                className="hover-elevate active-elevate-2 cursor-pointer transition-all border-primary/50 bg-primary/5"
+                onClick={() => setLocation("/admin")}
+                data-testid="card-admin-console"
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <ShieldCheck className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Console Admin</CardTitle>
+                        <CardDescription>
+                          Manage fiscal year plans and site users
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
+
             {accounts?.map((account) => (
               <Card
                 key={account.id}
