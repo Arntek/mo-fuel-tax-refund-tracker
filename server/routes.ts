@@ -941,8 +941,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const successUrl = `${baseUrl}/dashboard/${req.accountId}?payment=success`;
-      const cancelUrl = `${baseUrl}/dashboard/${req.accountId}?payment=canceled`;
+      const successUrl = `${baseUrl}/billing/${req.accountId}?payment=success`;
+      const cancelUrl = `${baseUrl}/billing/${req.accountId}?payment=canceled`;
 
       const checkoutUrl = await stripeService.createCheckoutSession(
         req.accountId,
@@ -989,24 +989,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe webhook handler
-  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-    const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!sig || !webhookSecret) {
-      return res.status(400).json({ error: "Missing signature or webhook secret" });
-    }
-
-    try {
-      const event = stripeService.getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
-      await stripeService.handleWebhookEvent(event);
-      res.json({ received: true });
-    } catch (error) {
-      console.error("Webhook error:", error);
-      res.status(400).json({ error: "Webhook verification failed" });
-    }
-  });
+  // NOTE: Stripe webhook is registered in server/index.ts BEFORE body parsers
+  // to ensure raw body is available for signature verification
 
   const httpServer = createServer(app);
 

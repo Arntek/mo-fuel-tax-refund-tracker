@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import * as stripeService from "./stripe";
 
 const app = express();
 
@@ -9,6 +10,37 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+// Stripe webhook MUST be registered BEFORE global body parsers
+// because it needs the raw body for signature verification
+app.post("/api/stripe/webhook", 
+  express.raw({ type: "application/json" }), 
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!sig || !webhookSecret) {
+      console.error("[Stripe Webhook] Missing signature or webhook secret");
+      return res.status(400).json({ error: "Missing signature or webhook secret" });
+    }
+
+    try {
+      // req.body is a Buffer when using express.raw() middleware
+      const event = stripeService.getStripe().webhooks.constructEvent(
+        req.body,  // This is now a Buffer, not parsed JSON
+        sig,
+        webhookSecret
+      );
+      console.log(`[Stripe Webhook] Received event: ${event.type}`);
+      await stripeService.handleWebhookEvent(event);
+      res.json({ received: true });
+    } catch (error) {
+      console.error("[Stripe Webhook] Error:", error);
+      res.status(400).json({ error: "Webhook verification failed" });
+    }
+  }
+);
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
