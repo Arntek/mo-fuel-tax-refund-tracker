@@ -989,6 +989,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get payment history for current user (fetches from Stripe)
+  app.get("/api/billing/payments", authMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.json({ payments: [] });
+      }
+
+      const user = await storage.getUserById(req.userId);
+      if (!user?.stripeCustomerId) {
+        return res.json({ payments: [] });
+      }
+
+      const paymentIntents = await stripeService.getCustomerPayments(user.stripeCustomerId);
+      
+      // Filter to only successful payments and map to a simpler format
+      const payments = paymentIntents
+        .filter(pi => pi.status === "succeeded")
+        .map(pi => ({
+          id: pi.id,
+          amount: pi.amount,
+          currency: pi.currency,
+          created: pi.created,
+          description: pi.description,
+          receiptUrl: pi.charges?.data?.[0]?.receipt_url || null,
+          metadata: pi.metadata,
+        }));
+
+      res.json({ payments });
+    } catch (error) {
+      console.error("Error fetching payment history:", error);
+      res.status(500).json({ error: "Failed to fetch payment history" });
+    }
+  });
+
   // NOTE: Stripe webhook is registered in server/index.ts BEFORE body parsers
   // to ensure raw body is available for signature verification
 
