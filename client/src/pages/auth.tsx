@@ -141,7 +141,16 @@ export default function Auth() {
             <Receipt className="w-6 h-6 text-primary" />
             <h1 className="text-lg font-semibold">Refund Tracker</h1>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setStep("email")}
+              data-testid="button-navbar-login"
+            >
+              Login
+            </Button>
+            <ThemeToggle />
+          </div>
         </header>
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
           <div className="max-w-4xl w-full space-y-12">
