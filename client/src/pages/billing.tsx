@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, CreditCard, Receipt, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, CreditCard, Receipt, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText } from "lucide-react";
 import type { Account, FiscalYearPlan } from "@shared/schema";
 
 type SubscriptionStatus = {
@@ -17,6 +17,19 @@ type SubscriptionStatus = {
   receiptCount: number;
   canUpload: boolean;
   upgradeRequired: boolean;
+};
+
+type Payment = {
+  id: string;
+  amount: number;
+  currency: string;
+  created: number;
+  description: string | null;
+  receiptUrl: string | null;
+  metadata: {
+    accountId?: string;
+    fiscalYear?: string;
+  };
 };
 
 export default function Billing() {
@@ -42,6 +55,12 @@ export default function Billing() {
   const { data: plans = [] } = useQuery<FiscalYearPlan[]>({
     queryKey: ["/api/billing/plans"],
   });
+
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ payments: Payment[] }>({
+    queryKey: ["/api/billing/payments"],
+  });
+
+  const payments = paymentsData?.payments || [];
 
   const createCheckoutMutation = useMutation({
     mutationFn: async (fiscalYear: string) => {
@@ -249,11 +268,11 @@ export default function Billing() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              Manage Billing
+              <CreditCard className="w-5 h-5" />
+              Payment Methods
             </CardTitle>
             <CardDescription>
-              View payment history, update payment method, and manage your subscription
+              Update your payment method through our secure billing portal
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -269,10 +288,82 @@ export default function Billing() {
               ) : (
                 <>
                   <ExternalLink className="w-4 h-4" />
-                  Open Billing Portal
+                  Update Payment Method
                 </>
               )}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5" />
+              Payment History
+            </CardTitle>
+            <CardDescription>
+              Your past subscription payments and receipts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {paymentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : payments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No payment history yet</p>
+                <p className="text-sm mt-1">Your payments will appear here after you subscribe</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                    data-testid={`payment-${payment.id}`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {payment.metadata.fiscalYear
+                            ? `Fiscal Year ${payment.metadata.fiscalYear} Subscription`
+                            : payment.description || "Subscription Payment"}
+                        </p>
+                        <Badge variant="secondary" className="text-xs">Paid</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(payment.created * 1000).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <p className="font-semibold">
+                        ${(payment.amount / 100).toFixed(2)} {payment.currency.toUpperCase()}
+                      </p>
+                      {payment.receiptUrl && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          asChild
+                          className="gap-1"
+                          data-testid={`button-receipt-${payment.id}`}
+                        >
+                          <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
+                            <FileText className="w-4 h-4" />
+                            Receipt
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

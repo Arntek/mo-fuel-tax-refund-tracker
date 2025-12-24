@@ -150,6 +150,14 @@ export async function createCheckoutSession(
       userId,
       fiscalYear,
     },
+    payment_intent_data: {
+      metadata: {
+        accountId,
+        userId,
+        fiscalYear,
+      },
+      description: `Missouri Form 4923-H Tax Refund - Fiscal Year ${fiscalYear}`,
+    },
     success_url: successUrl,
     cancel_url: cancelUrl,
   });
