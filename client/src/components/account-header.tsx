@@ -2,10 +2,12 @@ import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Upload, Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu, CreditCard } from "lucide-react";
+import { Upload, Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu, CreditCard, ShieldCheck } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { User } from "@shared/schema";
 
 type Account = {
   id: string;
@@ -22,6 +24,10 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
 
   const handleLogout = async () => {
     try {
@@ -129,6 +135,13 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
               <CreditCard className="w-4 h-4" />
             </Link>
           </Button>
+          {user?.isAdmin && (
+            <Button variant="ghost" size="icon" data-testid="button-admin" aria-label="Admin" asChild>
+              <Link href="/admin">
+                <ShieldCheck className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout" aria-label="Logout">
             <LogOut className="w-4 h-4" />
@@ -189,6 +202,14 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
                     <span>Billing</span>
                   </Link>
                 </Button>
+                {user?.isAdmin && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-admin" asChild>
+                    <Link href="/admin" onClick={closeMenu}>
+                      <ShieldCheck className="w-5 h-5" />
+                      <span>Site Admin</span>
+                    </Link>
+                  </Button>
+                )}
                 <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => { closeMenu(); handleLogout(); }} data-testid="mobile-button-logout">
                   <LogOut className="w-5 h-5" />
                   <span>Logout</span>
