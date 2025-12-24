@@ -533,6 +533,140 @@ export class DbStorage implements IStorage {
     const [updated] = await db.update(schema.accountSubscriptions).set(updates).where(eq(schema.accountSubscriptions.id, id)).returning();
     return updated;
   }
+
+  // Admin stats
+  async getAdminStats(fiscalYear?: string): Promise<{
+    totalRevenue: number;
+    paidAccounts: number;
+    trialAccounts: number;
+    totalAccounts: number;
+  }> {
+    let subscriptionsQuery = db.select().from(schema.accountSubscriptions);
+    
+    if (fiscalYear) {
+      subscriptionsQuery = subscriptionsQuery.where(eq(schema.accountSubscriptions.fiscalYear, fiscalYear)) as any;
+    }
+
+    const subscriptions = await subscriptionsQuery;
+    
+    const paidAccounts = subscriptions.filter(s => s.status === "active").length;
+    const trialAccounts = subscriptions.filter(s => s.status === "trial").length;
+    
+    // Get all accounts for total count
+    const allAccounts = await db.select().from(schema.accounts);
+    
+    // Calculate revenue from paid subscriptions
+    // Get all plans to map fiscal year to price
+    const plans = await db.select().from(schema.fiscalYearPlans);
+    const planPriceMap = new Map(plans.map(p => [p.fiscalYear, p.priceInCents]));
+    
+    let totalRevenue = 0;
+    for (const sub of subscriptions) {
+      if (sub.status === "active" && sub.paidAt) {
+        const price = planPriceMap.get(sub.fiscalYear) || 0;
+        totalRevenue += price;
+      }
+    }
+
+    return {
+      totalRevenue,
+      paidAccounts,
+      trialAccounts,
+      totalAccounts: allAccounts.length,
+    };
+  }
+
+  // Admin accounts with payments and search
+  async getAdminAccountsWithPayments(fiscalYear?: string, search?: string): Promise<{
+    id: string;
+    name: string;
+    ownerName: string;
+    ownerEmail: string;
+    fiscalYear: string;
+    status: string;
+    paidAt: Date | null;
+    stripePaymentIntentId: string | null;
+    receiptCount: number;
+  }[]> {
+    // Get all subscriptions
+    let subscriptionsQuery = db.select().from(schema.accountSubscriptions);
+    if (fiscalYear) {
+      subscriptionsQuery = subscriptionsQuery.where(eq(schema.accountSubscriptions.fiscalYear, fiscalYear)) as any;
+    }
+    const subscriptions = await subscriptionsQuery;
+
+    // Get all accounts
+    const allAccounts = await db.select().from(schema.accounts);
+    
+    // Get all users for owner lookup
+    const allUsers = await db.select().from(schema.users);
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+
+    const results = [];
+
+    for (const account of allAccounts) {
+      const owner = userMap.get(account.ownerId);
+      const ownerName = owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() : "Unknown";
+      const ownerEmail = owner?.email || "";
+
+      // Filter by search if provided
+      if (search) {
+        const searchLower = search.toLowerCase();
+        const matchesName = account.name.toLowerCase().includes(searchLower);
+        const matchesOwner = ownerName.toLowerCase().includes(searchLower);
+        const matchesEmail = ownerEmail.toLowerCase().includes(searchLower);
+        if (!matchesName && !matchesOwner && !matchesEmail) {
+          continue;
+        }
+      }
+
+      // Get subscriptions for this account
+      const accountSubs = subscriptions.filter(s => s.accountId === account.id);
+      
+      if (accountSubs.length === 0) {
+        // No subscription yet - show as trial
+        if (!fiscalYear) {
+          results.push({
+            id: account.id,
+            name: account.name,
+            ownerName,
+            ownerEmail,
+            fiscalYear: "No subscription",
+            status: "none",
+            paidAt: null,
+            stripePaymentIntentId: null,
+            receiptCount: 0,
+          });
+        }
+      } else {
+        for (const sub of accountSubs) {
+          results.push({
+            id: account.id,
+            name: account.name,
+            ownerName,
+            ownerEmail,
+            fiscalYear: sub.fiscalYear,
+            status: sub.status,
+            paidAt: sub.paidAt,
+            stripePaymentIntentId: sub.stripePaymentIntentId,
+            receiptCount: sub.receiptCount,
+          });
+        }
+      }
+    }
+
+    // Sort by paid date descending (most recent first), then by name
+    results.sort((a, b) => {
+      if (a.paidAt && b.paidAt) {
+        return new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime();
+      }
+      if (a.paidAt) return -1;
+      if (b.paidAt) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return results;
+  }
 }
 
 export const storage = new DbStorage();

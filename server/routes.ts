@@ -897,6 +897,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin stats endpoint
+  app.get("/api/admin/stats", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const fiscalYear = req.query.fiscalYear as string | undefined;
+      const stats = await storage.getAdminStats(fiscalYear);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting admin stats:", error);
+      res.status(500).json({ error: "Failed to get stats" });
+    }
+  });
+
+  // Admin accounts with payments
+  app.get("/api/admin/accounts", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const fiscalYear = req.query.fiscalYear as string | undefined;
+      const search = req.query.search as string | undefined;
+      const accounts = await storage.getAdminAccountsWithPayments(fiscalYear, search);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error getting admin accounts:", error);
+      res.status(500).json({ error: "Failed to get accounts" });
+    }
+  });
+
+  // Admin refund payment
+  app.post("/api/admin/payments/:paymentIntentId/refund", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ error: "Stripe not configured" });
+      }
+
+      const { paymentIntentId } = req.params;
+      const { reason } = req.body;
+      
+      const refund = await stripeService.refundPayment(paymentIntentId, reason);
+      
+      // Log the refund action
+      console.log(`[Admin Refund] Payment ${paymentIntentId} refunded by admin ${req.userId}, refund ID: ${refund.id}`);
+      
+      res.json({ success: true, refundId: refund.id });
+    } catch (error: any) {
+      console.error("Error refunding payment:", error);
+      res.status(500).json({ error: error.message || "Failed to refund payment" });
+    }
+  });
+
   // ==================== BILLING ROUTES ====================
 
   app.get("/api/accounts/:accountId/subscription", authMiddleware, accountAccessMiddleware, async (req: any, res) => {

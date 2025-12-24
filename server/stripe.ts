@@ -265,6 +265,31 @@ export async function getCustomerInvoices(customerId: string): Promise<Stripe.In
   return invoices.data;
 }
 
+export async function getAllPayments(limit: number = 100): Promise<Stripe.PaymentIntent[]> {
+  const payments = await requireStripe().paymentIntents.list({
+    limit,
+  });
+  return payments.data;
+}
+
+export async function refundPayment(paymentIntentId: string, reason?: string): Promise<Stripe.Refund> {
+  const refund = await requireStripe().refunds.create({
+    payment_intent: paymentIntentId,
+    reason: "requested_by_customer",
+    metadata: {
+      refundedBy: "admin",
+      refundReason: reason || "Admin initiated refund",
+    },
+  });
+  return refund;
+}
+
+export async function getPaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
+  return await requireStripe().paymentIntents.retrieve(paymentIntentId, {
+    expand: ["charges.data.refunds"],
+  });
+}
+
 export async function getSubscriptionStatus(
   accountId: string,
   fiscalYear: string
