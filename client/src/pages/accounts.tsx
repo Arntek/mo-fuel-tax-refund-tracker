@@ -1,10 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Receipt, Users, ChevronRight, LogOut, Plus } from "lucide-react";
+import { Receipt, Users, ChevronRight, LogOut, Plus, ShieldCheck } from "lucide-react";
+import type { User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -32,6 +33,10 @@ export default function Accounts() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newAccountName, setNewAccountName] = useState("");
   const [newAccountType, setNewAccountType] = useState<"family" | "business">("family");
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -109,6 +114,13 @@ export default function Accounts() {
           <h1 className="text-lg font-semibold">Receipt Tracker</h1>
         </div>
         <div className="flex items-center gap-2">
+          {user?.isAdmin && (
+            <Button variant="ghost" size="icon" asChild data-testid="button-admin">
+              <Link href="/admin">
+                <ShieldCheck className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
             <LogOut className="w-4 h-4" />

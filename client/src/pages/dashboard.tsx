@@ -8,11 +8,30 @@ import { ReceiptModal } from "@/components/receipt-modal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Car, Check, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Car, Check, Loader2, AlertTriangle, CreditCard } from "lucide-react";
 import { Receipt } from "@shared/schema";
+
+type SubscriptionStatus = {
+  status: "trial" | "active" | "expired" | "cancelled";
+  trialDaysRemaining: number | null;
+  receiptCount: number;
+  canUpload: boolean;
+  upgradeRequired: boolean;
+};
 
 type Account = any;
 type Vehicle = any;
+
+function getCurrentFiscalYear(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  if (month >= 6) {
+    return `${year}-${year + 1}`;
+  }
+  return `${year - 1}-${year}`;
+}
 
 export default function Dashboard() {
   const params = useParams();
@@ -29,6 +48,18 @@ export default function Dashboard() {
 
   const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
     queryKey: ["/api/accounts", accountId, "vehicles"],
+    enabled: !!accountId,
+  });
+
+  const currentFiscalYear = getCurrentFiscalYear();
+
+  const { data: subscriptionStatus } = useQuery<SubscriptionStatus>({
+    queryKey: ["/api/accounts", accountId, "subscription", currentFiscalYear],
+    queryFn: async () => {
+      const response = await fetch(`/api/accounts/${accountId}/subscription?fiscalYear=${currentFiscalYear}`);
+      if (!response.ok) return { status: "trial", trialDaysRemaining: 30, receiptCount: 0, canUpload: true, upgradeRequired: false };
+      return response.json();
+    },
     enabled: !!accountId,
   });
 
@@ -145,7 +176,60 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {vehicles.length > 0 && (
+          {subscriptionStatus?.upgradeRequired && (
+            <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                  <AlertTriangle className="w-5 h-5" />
+                  Upgrade Required
+                </CardTitle>
+                <CardDescription className="text-amber-700 dark:text-amber-300">
+                  {subscriptionStatus.receiptCount >= 8 
+                    ? `You've reached the 8-receipt trial limit for ${currentFiscalYear}.`
+                    : `Your 30-day trial for ${currentFiscalYear} has ended.`}
+                  {" "}Subscribe to continue uploading receipts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    Receipts uploaded: <span className="font-medium">{subscriptionStatus.receiptCount} / 8</span>
+                  </p>
+                  <Progress value={Math.min(100, (subscriptionStatus.receiptCount / 8) * 100)} className="h-2 mt-2" />
+                </div>
+                <Button asChild className="gap-2" data-testid="button-upgrade-dashboard">
+                  <Link href={`/billing/${accountId}`}>
+                    <CreditCard className="w-4 h-4" />
+                    Subscribe Now
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {subscriptionStatus?.status === "trial" && !subscriptionStatus?.upgradeRequired && (
+            <Card className="border-muted">
+              <CardContent className="py-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    Trial: <span className="font-medium text-foreground">{subscriptionStatus.receiptCount}/8 receipts</span>
+                    {subscriptionStatus.trialDaysRemaining !== null && (
+                      <span className="ml-2">
+                        • <span className="font-medium text-foreground">{subscriptionStatus.trialDaysRemaining} days</span> remaining
+                      </span>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm" asChild className="text-xs">
+                    <Link href={`/billing/${accountId}`}>
+                      View Subscription
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {vehicles.length > 0 && !subscriptionStatus?.upgradeRequired && (
             <>
               {/* Step 1: Select Vehicle */}
               <Card>

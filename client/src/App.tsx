@@ -12,6 +12,8 @@ import People from "@/pages/people";
 import Vehicles from "@/pages/vehicles";
 import VehicleEdit from "@/pages/vehicle-edit";
 import Settings from "@/pages/settings";
+import Admin from "@/pages/admin";
+import Billing from "@/pages/billing";
 import NotFound from "@/pages/not-found";
 
 function AuthCheck({ children }: { children: React.ReactNode }) {
@@ -72,6 +74,16 @@ function Router() {
       <Route path="/settings/:accountId">
         <AuthCheck>
           <Settings />
+        </AuthCheck>
+      </Route>
+      <Route path="/admin">
+        <AuthCheck>
+          <Admin />
+        </AuthCheck>
+      </Route>
+      <Route path="/billing/:accountId">
+        <AuthCheck>
+          <Billing />
         </AuthCheck>
       </Route>
       <Route component={NotFound} />

@@ -10,11 +10,14 @@ import {
   insertUserSchema, 
   insertAccountSchema,
   insertVehicleSchema,
-  insertAccountMemberSchema 
+  insertAccountMemberSchema,
+  insertFiscalYearPlanSchema
 } from "@shared/schema";
 import multer from "multer";
 import { createAuthCodeForEmail, verifyAuthCode, createSession, getUserFromSession } from "./auth";
 import cookieParser from "cookie-parser";
+import * as stripeService from "./stripe";
+import express from "express";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -55,6 +58,16 @@ async function adminMiddleware(req: any, res: any, next: any) {
   
   if (role !== "owner" && role !== "admin") {
     return res.status(403).json({ error: "Admin access required" });
+  }
+  
+  next();
+}
+
+async function siteAdminMiddleware(req: any, res: any, next: any) {
+  const user = await storage.getUserById(req.userId);
+  
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ error: "Site admin access required" });
   }
   
   next();
@@ -563,6 +576,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
+      // Server-side subscription enforcement
+      const fiscalYear = getFiscalYear(new Date().toISOString().split('T')[0]);
+      const subscriptionStatus = await stripeService.getSubscriptionStatus(req.accountId, fiscalYear);
+      
+      if (subscriptionStatus.upgradeRequired) {
+        return res.status(403).json({ 
+          error: "Subscription required",
+          message: subscriptionStatus.receiptCount >= 8 
+            ? "You've reached the 8-receipt trial limit. Please subscribe to continue uploading receipts."
+            : "Your 30-day trial has ended. Please subscribe to continue uploading receipts.",
+          upgradeRequired: true
+        });
+      }
+
       const { vehicleId } = req.body;
 
       // Upload directly to object storage using Replit SDK, organized by accountId
@@ -598,8 +625,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertReceiptSchema.parse(receiptData);
       const receipt = await storage.createReceipt(validated);
       
-      // Increment the receipt counter for the account
+      // Increment the receipt counter for the account (legacy field)
       await storage.incrementReceiptCounter(req.accountId);
+      
+      // Increment the subscription receipt count for trial enforcement (fiscalYear already defined above)
+      await stripeService.incrementReceiptCount(req.accountId, fiscalYear);
 
       // Return immediately to allow user to continue
       res.json(receipt);
@@ -759,6 +789,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting receipt:", error);
       res.status(500).json({ error: "Failed to delete receipt" });
+    }
+  });
+
+  // ==================== ADMIN ROUTES ====================
+
+  app.get("/api/admin/plans", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const plans = await storage.getAllFiscalYearPlans();
+      res.json(plans);
+    } catch (error) {
+      console.error("Error getting plans:", error);
+      res.status(500).json({ error: "Failed to get plans" });
+    }
+  });
+
+  app.post("/api/admin/plans", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ 
+          error: "Stripe not configured", 
+          message: "Please configure STRIPE_SECRET_KEY to enable plan creation" 
+        });
+      }
+
+      const { fiscalYear, name, description, priceInCents } = req.body;
+      
+      if (!fiscalYear || !name) {
+        return res.status(400).json({ error: "Fiscal year and name required" });
+      }
+
+      const result = await stripeService.createFiscalYearPlan(
+        fiscalYear,
+        name,
+        description || `Subscription for fiscal year ${fiscalYear}`,
+        priceInCents || 1200
+      );
+
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Error creating plan:", error);
+      res.status(500).json({ error: "Failed to create plan" });
+    }
+  });
+
+  app.put("/api/admin/plans/:id", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ 
+          error: "Stripe not configured", 
+          message: "Please configure STRIPE_SECRET_KEY to enable plan updates" 
+        });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+
+      await stripeService.updateFiscalYearPlan(id, updates);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating plan:", error);
+      res.status(500).json({ error: "Failed to update plan" });
+    }
+  });
+
+  app.get("/api/admin/users", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsersWithStats();
+      res.json(users);
+    } catch (error) {
+      console.error("Error getting users:", error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  app.get("/api/admin/users/:userId/payments", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUserById(userId);
+      
+      if (!user || !user.stripeCustomerId) {
+        return res.json({ payments: [], invoices: [] });
+      }
+
+      const [payments, invoices] = await Promise.all([
+        stripeService.getCustomerPayments(user.stripeCustomerId),
+        stripeService.getCustomerInvoices(user.stripeCustomerId),
+      ]);
+
+      res.json({ payments, invoices });
+    } catch (error) {
+      console.error("Error getting user payments:", error);
+      res.status(500).json({ error: "Failed to get payments" });
+    }
+  });
+
+  app.put("/api/admin/users/:userId/admin", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { isAdmin } = req.body;
+
+      await storage.updateUserAdmin(userId, isAdmin);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating user admin status:", error);
+      res.status(500).json({ error: "Failed to update admin status" });
+    }
+  });
+
+  // ==================== BILLING ROUTES ====================
+
+  app.get("/api/accounts/:accountId/subscription", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      const { fiscalYear } = req.query;
+      
+      if (!fiscalYear) {
+        return res.status(400).json({ error: "Fiscal year required" });
+      }
+
+      const status = await stripeService.getSubscriptionStatus(req.accountId, fiscalYear as string);
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting subscription status:", error);
+      res.status(500).json({ error: "Failed to get subscription status" });
+    }
+  });
+
+  app.get("/api/accounts/:accountId/subscriptions", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      const subscriptions = await storage.getAccountSubscriptions(req.accountId);
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error getting subscriptions:", error);
+      res.status(500).json({ error: "Failed to get subscriptions" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/checkout", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ 
+          error: "Stripe not configured", 
+          message: "Payment processing is temporarily unavailable" 
+        });
+      }
+
+      const { fiscalYear } = req.body;
+      
+      if (!fiscalYear) {
+        return res.status(400).json({ error: "Fiscal year required" });
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const successUrl = `${baseUrl}/dashboard/${req.accountId}?payment=success`;
+      const cancelUrl = `${baseUrl}/dashboard/${req.accountId}?payment=canceled`;
+
+      const checkoutUrl = await stripeService.createCheckoutSession(
+        req.accountId,
+        req.userId,
+        fiscalYear,
+        successUrl,
+        cancelUrl
+      );
+
+      res.json({ url: checkoutUrl });
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/billing-portal", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ 
+          error: "Stripe not configured", 
+          message: "Billing portal is temporarily unavailable" 
+        });
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const returnUrl = `${baseUrl}/dashboard/${req.accountId}`;
+
+      const portalUrl = await stripeService.createBillingPortalSession(req.userId, returnUrl);
+      res.json({ url: portalUrl });
+    } catch (error) {
+      console.error("Error creating billing portal session:", error);
+      res.status(500).json({ error: "Failed to create billing portal session" });
+    }
+  });
+
+  app.get("/api/billing/plans", async (req, res) => {
+    try {
+      const plans = await storage.getActiveFiscalYearPlans();
+      res.json(plans);
+    } catch (error) {
+      console.error("Error getting active plans:", error);
+      res.status(500).json({ error: "Failed to get plans" });
+    }
+  });
+
+  // Stripe webhook handler
+  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!sig || !webhookSecret) {
+      return res.status(400).json({ error: "Missing signature or webhook secret" });
+    }
+
+    try {
+      const event = stripeService.getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
+      await stripeService.handleWebhookEvent(event);
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Webhook error:", error);
+      res.status(400).json({ error: "Webhook verification failed" });
     }
   });
 

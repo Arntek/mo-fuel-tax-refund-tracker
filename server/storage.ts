@@ -20,13 +20,17 @@ import {
   type VehicleMember,
   type InsertVehicleMember,
   type TaxRate,
+  type FiscalYearPlan,
+  type InsertFiscalYearPlan,
+  type AccountSubscription,
+  type InsertAccountSubscription,
 } from "@shared/schema";
 import ws from "ws";
 
 neonConfig.webSocketConstructor = ws;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const db = drizzle(pool, { schema });
+export const db = drizzle(pool, { schema });
 
 export interface IStorage {
   // User operations
@@ -446,6 +450,88 @@ export class DbStorage implements IStorage {
   async deleteReceipt(id: string): Promise<boolean> {
     const result = await db.delete(schema.receipts).where(eq(schema.receipts.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Admin operations
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    return user;
+  }
+
+  async updateUserAdmin(userId: string, isAdmin: boolean): Promise<void> {
+    await db.update(schema.users).set({ isAdmin }).where(eq(schema.users.id, userId));
+  }
+
+  async getAllUsersWithStats(): Promise<(User & { totalReceipts: number; totalRefund: number; accountCount: number })[]> {
+    const users = await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+    
+    const usersWithStats = await Promise.all(
+      users.map(async (user) => {
+        const memberships = await db
+          .select()
+          .from(schema.accountMembers)
+          .where(and(eq(schema.accountMembers.userId, user.id), eq(schema.accountMembers.active, true)));
+        
+        let totalReceipts = 0;
+        let totalRefund = 0;
+
+        for (const membership of memberships) {
+          const receipts = await db
+            .select()
+            .from(schema.receipts)
+            .where(eq(schema.receipts.accountId, membership.accountId));
+          
+          totalReceipts += receipts.length;
+        }
+
+        return {
+          ...user,
+          totalReceipts,
+          totalRefund,
+          accountCount: memberships.length,
+        };
+      })
+    );
+
+    return usersWithStats;
+  }
+
+  // Fiscal Year Plan operations
+  async getAllFiscalYearPlans(): Promise<FiscalYearPlan[]> {
+    return db.select().from(schema.fiscalYearPlans).orderBy(desc(schema.fiscalYearPlans.fiscalYear));
+  }
+
+  async getActiveFiscalYearPlans(): Promise<FiscalYearPlan[]> {
+    return db.select().from(schema.fiscalYearPlans).where(eq(schema.fiscalYearPlans.active, true)).orderBy(desc(schema.fiscalYearPlans.fiscalYear));
+  }
+
+  async getFiscalYearPlan(fiscalYear: string): Promise<FiscalYearPlan | undefined> {
+    const [plan] = await db.select().from(schema.fiscalYearPlans).where(eq(schema.fiscalYearPlans.fiscalYear, fiscalYear)).limit(1);
+    return plan;
+  }
+
+  // Account Subscription operations
+  async getAccountSubscriptions(accountId: string): Promise<AccountSubscription[]> {
+    return db.select().from(schema.accountSubscriptions).where(eq(schema.accountSubscriptions.accountId, accountId)).orderBy(desc(schema.accountSubscriptions.fiscalYear));
+  }
+
+  async getAccountSubscription(accountId: string, fiscalYear: string): Promise<AccountSubscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(schema.accountSubscriptions)
+      .where(and(eq(schema.accountSubscriptions.accountId, accountId), eq(schema.accountSubscriptions.fiscalYear, fiscalYear)))
+      .limit(1);
+    return subscription;
+  }
+
+  async createAccountSubscription(subscription: InsertAccountSubscription): Promise<AccountSubscription> {
+    const [created] = await db.insert(schema.accountSubscriptions).values(subscription).returning();
+    return created;
+  }
+
+  async updateAccountSubscription(id: string, updates: Partial<InsertAccountSubscription>): Promise<AccountSubscription | undefined> {
+    const [updated] = await db.update(schema.accountSubscriptions).set(updates).where(eq(schema.accountSubscriptions.id, id)).returning();
+    return updated;
   }
 }
 

@@ -194,8 +194,10 @@ export default function Auth() {
                 <div className="text-4xl font-bold text-primary">$12</div>
                 <CardDescription className="text-base">per fiscal year</CardDescription>
               </CardHeader>
-              <CardContent className="text-center space-y-2">
-                <p className="text-lg font-medium text-foreground">Free 30-day trial</p>
+              <CardContent className="text-center space-y-3">
+                <p className="text-lg font-medium text-foreground">Free trial included</p>
+                <p className="text-sm text-muted-foreground">30 days or 8 receipts, whichever comes first</p>
+                <p className="text-sm text-muted-foreground">No credit card required to start</p>
               </CardContent>
             </Card>
 

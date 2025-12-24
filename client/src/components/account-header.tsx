@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Upload, Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu } from "lucide-react";
+import { Upload, Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu, CreditCard } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -124,6 +124,11 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
               <Settings className="w-4 h-4" />
             </Link>
           </Button>
+          <Button variant="ghost" size="icon" data-testid="button-billing" aria-label="Billing" asChild>
+            <Link href={`/billing/${accountId}`}>
+              <CreditCard className="w-4 h-4" />
+            </Link>
+          </Button>
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout" aria-label="Logout">
             <LogOut className="w-4 h-4" />
@@ -176,6 +181,12 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
                   <Link href={`/settings/${accountId}`} onClick={closeMenu}>
                     <Settings className="w-5 h-5" />
                     <span>Settings</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-billing" asChild>
+                  <Link href={`/billing/${accountId}`} onClick={closeMenu}>
+                    <CreditCard className="w-5 h-5" />
+                    <span>Billing</span>
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => { closeMenu(); handleLogout(); }} data-testid="mobile-button-logout">

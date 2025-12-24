@@ -8,6 +8,8 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   firstName: varchar("first_name", { length: 255 }).notNull(),
   lastName: varchar("last_name", { length: 255 }).notNull(),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   emailIdx: index("email_idx").on(table.email),
@@ -133,6 +135,36 @@ export const receipts = pgTable("receipts", {
   vehicleIdx: index("receipt_vehicle_idx").on(table.vehicleId),
 }));
 
+export const fiscalYearPlans = pgTable("fiscal_year_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fiscalYear: text("fiscal_year").notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  priceInCents: integer("price_in_cents").notNull().default(1200),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  stripeProductId: varchar("stripe_product_id", { length: 255 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const accountSubscriptions = pgTable("account_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  fiscalYear: text("fiscal_year").notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("trial"),
+  trialStartedAt: timestamp("trial_started_at"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  receiptCount: integer("receipt_count").notNull().default(0),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  canceledAt: timestamp("canceled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  accountFiscalYearIdx: index("account_subscription_idx").on(table.accountId, table.fiscalYear),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -186,6 +218,16 @@ export const insertReceiptSchema = createInsertSchema(receipts).omit({
   processingError: z.string().optional().nullable(),
 });
 
+export const insertFiscalYearPlanSchema = createInsertSchema(fiscalYearPlans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAccountSubscriptionSchema = createInsertSchema(accountSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
@@ -212,6 +254,12 @@ export type InsertVehicleMember = z.infer<typeof insertVehicleMemberSchema>;
 
 export type TaxRate = typeof taxRates.$inferSelect;
 export type InsertTaxRate = z.infer<typeof insertTaxRateSchema>;
+
+export type FiscalYearPlan = typeof fiscalYearPlans.$inferSelect;
+export type InsertFiscalYearPlan = z.infer<typeof insertFiscalYearPlanSchema>;
+
+export type AccountSubscription = typeof accountSubscriptions.$inferSelect;
+export type InsertAccountSubscription = z.infer<typeof insertAccountSubscriptionSchema>;
 
 export const aiTranscriptionSchema = z.object({
   date: z.string().nullable(),
