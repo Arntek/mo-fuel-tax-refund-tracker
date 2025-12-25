@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Upload, Receipt, Settings, LogOut, Users, Car, ChevronDown, Menu, CreditCard } from "lucide-react";
@@ -22,6 +23,13 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const { data: roleData } = useQuery<{ role: string }>({
+    queryKey: ["/api/accounts", accountId, "my-role"],
+    enabled: !!accountId,
+  });
+
+  const isAdminOrOwner = roleData?.role === "owner" || roleData?.role === "admin";
 
   const handleLogout = async () => {
     try {
@@ -109,26 +117,32 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
               <Receipt className="w-4 h-4" />
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" data-testid="button-people" aria-label="People" asChild>
-            <Link href={`/people/${accountId}`}>
-              <Users className="w-4 h-4" />
-            </Link>
-          </Button>
+          {isAdminOrOwner && (
+            <Button variant="ghost" size="icon" data-testid="button-people" aria-label="People" asChild>
+              <Link href={`/people/${accountId}`}>
+                <Users className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" data-testid="button-vehicles" aria-label="Vehicles" asChild>
             <Link href={`/vehicles/${accountId}`}>
               <Car className="w-4 h-4" />
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" data-testid="button-settings" aria-label="Settings" asChild>
-            <Link href={`/settings/${accountId}`}>
-              <Settings className="w-4 h-4" />
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" data-testid="button-billing" aria-label="Billing" asChild>
-            <Link href={`/billing/${accountId}`}>
-              <CreditCard className="w-4 h-4" />
-            </Link>
-          </Button>
+          {isAdminOrOwner && (
+            <Button variant="ghost" size="icon" data-testid="button-settings" aria-label="Settings" asChild>
+              <Link href={`/settings/${accountId}`}>
+                <Settings className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
+          {isAdminOrOwner && (
+            <Button variant="ghost" size="icon" data-testid="button-billing" aria-label="Billing" asChild>
+              <Link href={`/billing/${accountId}`}>
+                <CreditCard className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
           <ThemeToggle />
           <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout" aria-label="Logout">
             <LogOut className="w-4 h-4" />
@@ -165,30 +179,36 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
                     <span>Receipts</span>
                   </Link>
                 </Button>
-                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-people" asChild>
-                  <Link href={`/people/${accountId}`} onClick={closeMenu}>
-                    <Users className="w-5 h-5" />
-                    <span>People</span>
-                  </Link>
-                </Button>
+                {isAdminOrOwner && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-people" asChild>
+                    <Link href={`/people/${accountId}`} onClick={closeMenu}>
+                      <Users className="w-5 h-5" />
+                      <span>People</span>
+                    </Link>
+                  </Button>
+                )}
                 <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-vehicles" asChild>
                   <Link href={`/vehicles/${accountId}`} onClick={closeMenu}>
                     <Car className="w-5 h-5" />
                     <span>Vehicles</span>
                   </Link>
                 </Button>
-                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-settings" asChild>
-                  <Link href={`/settings/${accountId}`} onClick={closeMenu}>
-                    <Settings className="w-5 h-5" />
-                    <span>Settings</span>
-                  </Link>
-                </Button>
-                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-billing" asChild>
-                  <Link href={`/billing/${accountId}`} onClick={closeMenu}>
-                    <CreditCard className="w-5 h-5" />
-                    <span>Billing</span>
-                  </Link>
-                </Button>
+                {isAdminOrOwner && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-settings" asChild>
+                    <Link href={`/settings/${accountId}`} onClick={closeMenu}>
+                      <Settings className="w-5 h-5" />
+                      <span>Settings</span>
+                    </Link>
+                  </Button>
+                )}
+                {isAdminOrOwner && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-billing" asChild>
+                    <Link href={`/billing/${accountId}`} onClick={closeMenu}>
+                      <CreditCard className="w-5 h-5" />
+                      <span>Billing</span>
+                    </Link>
+                  </Button>
+                )}
                 <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => { closeMenu(); handleLogout(); }} data-testid="mobile-button-logout">
                   <LogOut className="w-5 h-5" />
                   <span>Logout</span>
