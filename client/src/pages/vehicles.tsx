@@ -18,6 +18,13 @@ export default function Vehicles() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);
+
+  const { data: roleData } = useQuery<{ role: string }>({
+    queryKey: ["/api/accounts", accountId, "my-role"],
+    enabled: !!accountId,
+  });
+
+  const isAdminOrOwner = roleData?.role === "owner" || roleData?.role === "admin";
   const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
   const [year, setYear] = useState("");
@@ -194,11 +201,12 @@ export default function Vehicles() {
         </div>
 
         <div className="space-y-4">
-          {!showAddForm ? (
+          {isAdminOrOwner && !showAddForm && (
             <Button onClick={() => setShowAddForm(true)} data-testid="button-show-add-vehicle">
               Add Vehicle
             </Button>
-          ) : (
+          )}
+          {isAdminOrOwner && showAddForm && (
             <Card>
               <CardHeader>
                 <CardTitle>Add New Vehicle</CardTitle>
@@ -342,25 +350,27 @@ export default function Vehicles() {
                             {vehicle.vin && ` • VIN: ${vehicle.vin}`}
                           </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setLocation(`/vehicles/${accountId}/edit/${vehicle.id}`)}
-                            data-testid={`button-edit-vehicle-${vehicle.id}`}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteVehicleMutation.mutate(vehicle.id)}
-                            disabled={deleteVehicleMutation.isPending}
-                            data-testid={`button-delete-vehicle-${vehicle.id}`}
-                          >
-                            Delete
-                          </Button>
-                        </div>
+                        {isAdminOrOwner && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setLocation(`/vehicles/${accountId}/edit/${vehicle.id}`)}
+                              data-testid={`button-edit-vehicle-${vehicle.id}`}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteVehicleMutation.mutate(vehicle.id)}
+                              disabled={deleteVehicleMutation.isPending}
+                              data-testid={`button-delete-vehicle-${vehicle.id}`}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardHeader>
                   </Card>
@@ -401,16 +411,18 @@ export default function Vehicles() {
                             {vehicle.vin && ` • VIN: ${vehicle.vin}`}
                           </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setLocation(`/vehicles/${accountId}/edit/${vehicle.id}`)}
-                            data-testid={`button-edit-vehicle-inactive-${vehicle.id}`}
-                          >
-                            Edit
-                          </Button>
-                        </div>
+                        {isAdminOrOwner && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setLocation(`/vehicles/${accountId}/edit/${vehicle.id}`)}
+                              data-testid={`button-edit-vehicle-inactive-${vehicle.id}`}
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </CardHeader>
                   </Card>

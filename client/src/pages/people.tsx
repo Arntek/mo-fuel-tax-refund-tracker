@@ -2,14 +2,15 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Loader2, Car, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AccountHeader } from "@/components/account-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Account, AccountMember, User } from "@shared/schema";
+import type { Account, AccountMember, User, Vehicle, VehicleMember } from "@shared/schema";
 
 type MemberWithUser = AccountMember & { user: User };
 
@@ -43,6 +44,14 @@ export default function People() {
     queryKey: ["/api/accounts", accountId, "members"],
     enabled: !!accountId && isAdminOrOwner,
   });
+
+  const { data: vehicles = [] } = useQuery<Vehicle[]>({
+    queryKey: ["/api/accounts", accountId, "vehicles"],
+    enabled: !!accountId && isAdminOrOwner,
+  });
+
+  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [vehicleAssignments, setVehicleAssignments] = useState<Record<string, VehicleMember[]>>({});
 
   const addMemberMutation = useMutation({
     mutationFn: async () => {
@@ -116,6 +125,82 @@ export default function People() {
       });
     },
   });
+
+  const assignVehicleMutation = useMutation({
+    mutationFn: async ({ vehicleId, userId }: { vehicleId: string; userId: string }) => {
+      return apiRequest(`/api/accounts/${accountId}/vehicles/${vehicleId}/members`, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+    },
+    onSuccess: (_, { userId }) => {
+      loadVehicleAssignments(userId);
+      toast({
+        title: "Vehicle assigned",
+        description: "The vehicle has been assigned to this member",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to assign vehicle",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unassignVehicleMutation = useMutation({
+    mutationFn: async ({ vehicleId, userId }: { vehicleId: string; userId: string }) => {
+      return apiRequest(`/api/accounts/${accountId}/vehicles/${vehicleId}/members/${userId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: (_, { userId }) => {
+      loadVehicleAssignments(userId);
+      toast({
+        title: "Vehicle unassigned",
+        description: "The vehicle has been unassigned from this member",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to unassign vehicle",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const loadVehicleAssignments = async (userId: string) => {
+    const assignedVehicles: VehicleMember[] = [];
+    for (const vehicle of vehicles.filter(v => v.active)) {
+      try {
+        const members = await apiRequest<VehicleMember[]>(`/api/accounts/${accountId}/vehicles/${vehicle.id}/members`);
+        const userAssignment = members.find(m => m.userId === userId);
+        if (userAssignment) {
+          assignedVehicles.push(userAssignment);
+        }
+      } catch (error) {
+        console.error("Error loading vehicle members:", error);
+      }
+    }
+    setVehicleAssignments(prev => ({ ...prev, [userId]: assignedVehicles }));
+  };
+
+  const toggleMemberExpand = (userId: string) => {
+    if (expandedMember === userId) {
+      setExpandedMember(null);
+    } else {
+      setExpandedMember(userId);
+      if (!vehicleAssignments[userId]) {
+        loadVehicleAssignments(userId);
+      }
+    }
+  };
+
+  const getAssignedVehicleIds = (userId: string): string[] => {
+    return (vehicleAssignments[userId] || []).map(a => a.vehicleId);
+  };
 
   if (!accountId) {
     setLocation("/accounts");
@@ -252,6 +337,20 @@ export default function People() {
                             </SelectContent>
                           </Select>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleMemberExpand(member.userId)}
+                          data-testid={`button-vehicles-${member.userId}`}
+                        >
+                          <Car className="w-4 h-4 mr-1" />
+                          Vehicles
+                          {expandedMember === member.userId ? (
+                            <ChevronUp className="w-4 h-4 ml-1" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 ml-1" />
+                          )}
+                        </Button>
                         {member.role !== "owner" && (
                           <Button
                             variant="ghost"
@@ -266,6 +365,58 @@ export default function People() {
                       </div>
                     </div>
                   </CardHeader>
+                  {expandedMember === member.userId && (
+                    <CardContent className="pt-0 pb-4">
+                      <div className="border-t pt-4">
+                        <div className="text-sm font-medium mb-2">Assigned Vehicles</div>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {getAssignedVehicleIds(member.userId).length === 0 ? (
+                            <span className="text-sm text-muted-foreground">No vehicles assigned</span>
+                          ) : (
+                            getAssignedVehicleIds(member.userId).map(vehicleId => {
+                              const vehicle = vehicles.find(v => v.id === vehicleId);
+                              if (!vehicle) return null;
+                              return (
+                                <Badge key={vehicleId} variant="secondary" className="flex items-center gap-1" data-testid={`badge-vehicle-${vehicleId}`}>
+                                  {vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                                  <button
+                                    onClick={() => unassignVehicleMutation.mutate({ vehicleId, userId: member.userId })}
+                                    className="ml-1 hover:text-destructive"
+                                    data-testid={`button-unassign-vehicle-${vehicleId}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              );
+                            })
+                          )}
+                        </div>
+                        <div className="text-sm font-medium mb-2">Add Vehicle</div>
+                        <Select
+                          value=""
+                          onValueChange={(vehicleId) => {
+                            if (vehicleId) {
+                              assignVehicleMutation.mutate({ vehicleId, userId: member.userId });
+                            }
+                          }}
+                          disabled={assignVehicleMutation.isPending}
+                        >
+                          <SelectTrigger className="w-full" data-testid={`select-assign-vehicle-${member.userId}`}>
+                            <SelectValue placeholder="Select a vehicle to assign" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {vehicles
+                              .filter(v => v.active && !getAssignedVehicleIds(member.userId).includes(v.id))
+                              .map(vehicle => (
+                                <SelectItem key={vehicle.id} value={vehicle.id} data-testid={`option-vehicle-${vehicle.id}`}>
+                                  {vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  )}
                 </Card>
               ))}
             </div>
