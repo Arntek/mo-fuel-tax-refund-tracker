@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,10 +37,36 @@ export default function Billing() {
   const params = useParams<{ accountId: string }>();
   const { accountId } = params;
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  const { data: roleData, isLoading: roleLoading } = useQuery<{ role: string }>({
+    queryKey: ["/api/accounts", accountId, "my-role"],
+    enabled: !!accountId,
+  });
+
+  const isAdminOrOwner = roleData?.role === "owner" || roleData?.role === "admin";
+
+  useEffect(() => {
+    if (!roleLoading && roleData && !isAdminOrOwner) {
+      setLocation(`/dashboard/${accountId}`);
+    }
+  }, [roleLoading, roleData, isAdminOrOwner, accountId, setLocation]);
 
   const { data: account } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
   });
+
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdminOrOwner) {
+    return null;
+  }
 
   const currentFiscalYear = getCurrentFiscalYear();
 

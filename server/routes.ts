@@ -251,6 +251,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/accounts/:accountId/my-role", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      
+      res.json({ role });
+    } catch (error) {
+      console.error("Error getting user role:", error);
+      res.status(500).json({ error: "Failed to get user role" });
+    }
+  });
+
   app.patch("/api/accounts/:accountId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const validated = insertAccountSchema.partial().omit({ ownerId: true }).parse(req.body);
@@ -267,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/accounts/:accountId/members", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+  app.get("/api/accounts/:accountId/members", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const members = await storage.getAccountMembers(req.accountId);
       res.json(members);
@@ -495,7 +510,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/accounts/:accountId/receipts", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
-      const receipts = await storage.getAccountReceipts(req.accountId);
+      // Get user role for filtering
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      
+      if (!role) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Filter receipts based on role
+      const receipts = await storage.getAccountReceiptsForUser(req.accountId, req.userId, role);
       
       // Pre-fetch all unique tax rates once
       const uniqueDates = Array.from(new Set(receipts.map(r => r.date)));
@@ -1041,7 +1064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== BILLING ROUTES ====================
 
-  app.get("/api/accounts/:accountId/subscription", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+  app.get("/api/accounts/:accountId/subscription", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const { fiscalYear } = req.query;
       
@@ -1057,7 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/accounts/:accountId/subscriptions", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+  app.get("/api/accounts/:accountId/subscriptions", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const subscriptions = await storage.getAccountSubscriptions(req.accountId);
       res.json(subscriptions);
@@ -1067,7 +1090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/accounts/:accountId/checkout", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+  app.post("/api/accounts/:accountId/checkout", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       if (!stripeService.isStripeConfigured()) {
         return res.status(503).json({ 
@@ -1101,7 +1124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/accounts/:accountId/billing-portal", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+  app.post("/api/accounts/:accountId/billing-portal", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       if (!stripeService.isStripeConfigured()) {
         return res.status(503).json({ 

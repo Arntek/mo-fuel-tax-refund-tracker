@@ -1,8 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AccountHeader } from "@/components/account-header";
@@ -21,6 +21,19 @@ export default function People() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
 
+  const { data: roleData, isLoading: roleLoading } = useQuery<{ role: string }>({
+    queryKey: ["/api/accounts", accountId, "my-role"],
+    enabled: !!accountId,
+  });
+
+  const isAdminOrOwner = roleData?.role === "owner" || roleData?.role === "admin";
+
+  useEffect(() => {
+    if (!roleLoading && roleData && !isAdminOrOwner) {
+      setLocation(`/dashboard/${accountId}`);
+    }
+  }, [roleLoading, roleData, isAdminOrOwner, accountId, setLocation]);
+
   const { data: account, isLoading: accountLoading, error: accountError } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
@@ -28,8 +41,20 @@ export default function People() {
 
   const { data: members = [], isLoading: membersLoading } = useQuery<MemberWithUser[]>({
     queryKey: ["/api/accounts", accountId, "members"],
-    enabled: !!accountId,
+    enabled: !!accountId && isAdminOrOwner,
   });
+
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdminOrOwner) {
+    return null;
+  }
 
 
   const addMemberMutation = useMutation({

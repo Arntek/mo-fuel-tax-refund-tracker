@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Upload, Settings, LogOut, Users, Car, ChevronDown, Menu, Receipt } from "lucide-react";
+import { Upload, Settings, LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
@@ -29,6 +29,13 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
     queryKey: ["/api/accounts", accountId],
     enabled: !!accountId,
   });
+
+  const { data: roleData } = useQuery<{ role: string }>({
+    queryKey: ["/api/accounts", accountId, "my-role"],
+    enabled: !!accountId,
+  });
+
+  const isAdminOrOwner = roleData?.role === "owner" || roleData?.role === "admin";
 
   const handleLogout = async () => {
     try {
@@ -94,17 +101,26 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
               <Receipt className="w-4 h-4" />
             </Button>
           </Link>
-          <Link href={`/people/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-people">
-              <Users className="w-4 h-4" />
-            </Button>
-          </Link>
+          {isAdminOrOwner && (
+            <Link href={`/people/${accountId}`}>
+              <Button variant="ghost" size="icon" data-testid="button-people">
+                <Users className="w-4 h-4" />
+              </Button>
+            </Link>
+          )}
           <Link href={`/vehicles/${accountId}`}>
             <Button variant="ghost" size="icon" data-testid="button-vehicles">
               <Car className="w-4 h-4" />
             </Button>
           </Link>
-          {settingsContent && (
+          {isAdminOrOwner && (
+            <Link href={`/billing/${accountId}`}>
+              <Button variant="ghost" size="icon" data-testid="button-billing">
+                <CreditCard className="w-4 h-4" />
+              </Button>
+            </Link>
+          )}
+          {isAdminOrOwner && settingsContent && (
             <Button variant="ghost" size="icon" data-testid="button-settings">
               <Settings className="w-4 h-4" />
             </Button>
@@ -147,17 +163,19 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
                     Receipts
                   </Button>
                 </Link>
-                <Link href={`/people/${accountId}`}>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start gap-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                    data-testid="mobile-link-people"
-                  >
-                    <Users className="w-4 h-4" />
-                    People
-                  </Button>
-                </Link>
+                {isAdminOrOwner && (
+                  <Link href={`/people/${accountId}`}>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="mobile-link-people"
+                    >
+                      <Users className="w-4 h-4" />
+                      People
+                    </Button>
+                  </Link>
+                )}
                 <Link href={`/vehicles/${accountId}`}>
                   <Button 
                     variant="ghost" 
@@ -169,6 +187,19 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
                     Vehicles
                   </Button>
                 </Link>
+                {isAdminOrOwner && (
+                  <Link href={`/billing/${accountId}`}>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="mobile-link-billing"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Billing
+                    </Button>
+                  </Link>
+                )}
                 <div className="border-t my-2" />
                 <Button 
                   variant="ghost" 

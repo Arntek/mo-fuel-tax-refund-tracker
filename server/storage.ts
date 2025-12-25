@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";
-import { eq, and, desc, lte, gte, or, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, lte, gte, or, isNull, sql, inArray } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import {
   type User,
@@ -88,6 +88,7 @@ export interface IStorage {
 
   // Receipt operations
   getAccountReceipts(accountId: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
+  getAccountReceiptsForUser(accountId: string, userId: string, role: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
   getReceipt(id: string): Promise<Receipt | undefined>;
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
   updateReceipt(id: string, updates: Partial<InsertReceipt>): Promise<Receipt | undefined>;
@@ -423,6 +424,57 @@ export class DbStorage implements IStorage {
       .innerJoin(schema.users, eq(schema.receipts.uploadedBy, schema.users.id))
       .leftJoin(schema.vehicles, eq(schema.receipts.vehicleId, schema.vehicles.id))
       .where(eq(schema.receipts.accountId, accountId))
+      .orderBy(desc(schema.receipts.createdAt));
+
+    return receipts.map((r) => ({
+      ...r.receipt,
+      uploadedByUser: r.uploadedByUser,
+      vehicle: r.vehicle,
+    }));
+  }
+
+  async getAccountReceiptsForUser(accountId: string, userId: string, role: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]> {
+    // Owners and admins can see all receipts
+    if (role === "owner" || role === "admin") {
+      return this.getAccountReceipts(accountId);
+    }
+    
+    // Members can only see receipts they uploaded or for vehicles they're assigned to
+    const assignedVehicles = await db
+      .select({ vehicleId: schema.vehicleMembers.vehicleId })
+      .from(schema.vehicleMembers)
+      .where(eq(schema.vehicleMembers.userId, userId));
+    
+    const assignedVehicleIds = assignedVehicles.map(v => v.vehicleId);
+    
+    // Build condition: uploaded by user OR vehicle is in assigned list
+    let condition;
+    if (assignedVehicleIds.length > 0) {
+      condition = and(
+        eq(schema.receipts.accountId, accountId),
+        or(
+          eq(schema.receipts.uploadedBy, userId),
+          inArray(schema.receipts.vehicleId, assignedVehicleIds)
+        )
+      );
+    } else {
+      // No assigned vehicles, only show their own uploads
+      condition = and(
+        eq(schema.receipts.accountId, accountId),
+        eq(schema.receipts.uploadedBy, userId)
+      );
+    }
+    
+    const receipts = await db
+      .select({
+        receipt: schema.receipts,
+        uploadedByUser: schema.users,
+        vehicle: schema.vehicles,
+      })
+      .from(schema.receipts)
+      .innerJoin(schema.users, eq(schema.receipts.uploadedBy, schema.users.id))
+      .leftJoin(schema.vehicles, eq(schema.receipts.vehicleId, schema.vehicles.id))
+      .where(condition)
       .orderBy(desc(schema.receipts.createdAt));
 
     return receipts.map((r) => ({
