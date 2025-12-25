@@ -56,18 +56,6 @@ export default function Billing() {
     queryKey: ["/api/accounts", accountId],
   });
 
-  if (roleLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAdminOrOwner) {
-    return null;
-  }
-
   const currentFiscalYear = getCurrentFiscalYear();
 
   const { data: subscriptionStatus, isLoading: statusLoading } = useQuery<SubscriptionStatus>({
@@ -77,14 +65,17 @@ export default function Billing() {
       if (!response.ok) throw new Error("Failed to fetch subscription status");
       return response.json();
     },
+    enabled: isAdminOrOwner,
   });
 
   const { data: plans = [] } = useQuery<FiscalYearPlan[]>({
     queryKey: ["/api/billing/plans"],
+    enabled: isAdminOrOwner,
   });
 
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ payments: Payment[] }>({
     queryKey: ["/api/billing/payments"],
+    enabled: isAdminOrOwner,
   });
 
   const payments = paymentsData?.payments || [];
@@ -132,6 +123,18 @@ export default function Billing() {
   });
 
   const currentPlan = plans.find((p) => p.fiscalYear === currentFiscalYear);
+
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdminOrOwner) {
+    return null;
+  }
   const trialProgress = subscriptionStatus ? Math.min(100, (subscriptionStatus.receiptCount / 8) * 100) : 0;
 
   return (
