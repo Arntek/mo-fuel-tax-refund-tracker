@@ -476,6 +476,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vehicle member assignment endpoints
+  app.get("/api/accounts/:accountId/vehicles/:vehicleId/members", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      const { vehicleId } = req.params;
+      const members = await storage.getVehicleMembers(vehicleId);
+      res.json(members);
+    } catch (error) {
+      console.error("Error getting vehicle members:", error);
+      res.status(500).json({ error: "Failed to get vehicle members" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/vehicles/:vehicleId/members", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      const { vehicleId } = req.params;
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+      
+      // Verify the user is a member of this account
+      const isMember = await storage.isUserAccountMember(req.accountId, userId);
+      if (!isMember) {
+        return res.status(400).json({ error: "User is not a member of this account" });
+      }
+      
+      const member = await storage.addVehicleMember(vehicleId, userId);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("Error assigning vehicle member:", error);
+      res.status(500).json({ error: "Failed to assign vehicle member" });
+    }
+  });
+
+  app.delete("/api/accounts/:accountId/vehicles/:vehicleId/members/:userId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      const { vehicleId, userId } = req.params;
+      const success = await storage.removeVehicleMember(vehicleId, userId);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Vehicle member assignment not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing vehicle member:", error);
+      res.status(500).json({ error: "Failed to remove vehicle member" });
+    }
+  });
+
   app.get("/api/vin-lookup/:vin", authMiddleware, async (req, res) => {
     try {
       const { vin } = req.params;
