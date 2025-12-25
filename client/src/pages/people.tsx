@@ -276,30 +276,36 @@ export default function People() {
               <CardDescription>Invite someone to join this account</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  placeholder="member@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  data-testid="input-member-email"
-                />
-                <Select value={role} onValueChange={setRole}>
-                  <SelectTrigger className="w-32" data-testid="select-member-role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={() => addMemberMutation.mutate()}
-                  disabled={!email || addMemberMutation.isPending}
-                  data-testid="button-add-member"
-                >
-                  Add
-                </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <Input
+                    type="email"
+                    placeholder="member@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    data-testid="input-member-email"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger className="w-full sm:w-32" data-testid="select-member-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={() => addMemberMutation.mutate()}
+                    disabled={!email || addMemberMutation.isPending}
+                    data-testid="button-add-member"
+                    className="shrink-0"
+                  >
+                    Add
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -310,7 +316,7 @@ export default function People() {
               {members.filter(member => member.active).map(member => (
                 <Card key={member.id}>
                   <CardHeader className="py-3">
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-base">
                           {member.user.firstName} {member.user.lastName}
@@ -319,16 +325,16 @@ export default function People() {
                           {member.user.email}
                         </CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {member.role === "owner" ? (
-                          <span className="text-sm text-muted-foreground capitalize">{member.role}</span>
+                          <span className="text-sm text-muted-foreground capitalize px-3">{member.role}</span>
                         ) : (
                           <Select
                             value={member.role}
                             onValueChange={(newRole) => updateRoleMutation.mutate({ userId: member.userId, role: newRole })}
                             disabled={updateRoleMutation.isPending}
                           >
-                            <SelectTrigger className="w-32" data-testid={`select-role-${member.userId}`}>
+                            <SelectTrigger className="w-full sm:w-32" data-testid={`select-role-${member.userId}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -337,31 +343,35 @@ export default function People() {
                             </SelectContent>
                           </Select>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleMemberExpand(member.userId)}
-                          data-testid={`button-vehicles-${member.userId}`}
-                        >
-                          <Car className="w-4 h-4 mr-1" />
-                          Vehicles
-                          {expandedMember === member.userId ? (
-                            <ChevronUp className="w-4 h-4 ml-1" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 ml-1" />
-                          )}
-                        </Button>
-                        {member.role !== "owner" && (
+                        <div className="flex gap-2 w-full sm:w-auto">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => deactivateMemberMutation.mutate(member.userId)}
-                            disabled={deactivateMemberMutation.isPending}
-                            data-testid={`button-deactivate-member-${member.userId}`}
+                            onClick={() => toggleMemberExpand(member.userId)}
+                            data-testid={`button-vehicles-${member.userId}`}
+                            className="flex-1 sm:flex-none"
                           >
-                            Deactivate
+                            <Car className="w-4 h-4 mr-1" />
+                            Vehicles
+                            {expandedMember === member.userId ? (
+                              <ChevronUp className="w-4 h-4 ml-1" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 ml-1" />
+                            )}
                           </Button>
-                        )}
+                          {member.role !== "owner" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deactivateMemberMutation.mutate(member.userId)}
+                              disabled={deactivateMemberMutation.isPending}
+                              data-testid={`button-deactivate-member-${member.userId}`}
+                              className="text-destructive hover:text-destructive flex-1 sm:flex-none"
+                            >
+                              Deactivate
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
