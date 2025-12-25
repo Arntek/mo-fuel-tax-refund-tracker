@@ -922,6 +922,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin payments - fetch ALL payments directly from Stripe
+  app.get("/api/admin/payments", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.json({ payments: [] });
+      }
+
+      const fiscalYear = req.query.fiscalYear as string | undefined;
+      const search = req.query.search as string | undefined;
+
+      const stripePayments = await stripeService.getAllPayments(200);
+      
+      // Enrich payments with user/account information from metadata and database
+      const enrichedPayments = await Promise.all(
+        stripePayments
+          .filter(pi => pi.status === "succeeded" || pi.status === "canceled")
+          .map(async (pi) => {
+            const metadata = pi.metadata || {};
+            const accountId = metadata.accountId;
+            const userId = metadata.userId;
+            const paymentFiscalYear = metadata.fiscalYear;
+
+            // Filter by fiscal year if provided
+            if (fiscalYear && paymentFiscalYear !== fiscalYear) {
+              return null;
+            }
+
+            // Get user and account info from database if available
+            let userEmail = "";
+            let userName = "";
+            let accountName = "";
+
+            if (userId) {
+              const user = await storage.getUserById(userId);
+              if (user) {
+                userEmail = user.email;
+                userName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+              }
+            }
+
+            if (accountId) {
+              const account = await storage.getAccountById(accountId);
+              if (account) {
+                accountName = account.name;
+              }
+            }
+
+            // Check for refunds
+            const charges = (pi as any).charges?.data || [];
+            const refunded = charges.some((c: any) => c.refunded || (c.refunds?.data?.length > 0));
+
+            // Apply search filter
+            if (search) {
+              const searchLower = search.toLowerCase();
+              const matchesSearch = 
+                userEmail.toLowerCase().includes(searchLower) ||
+                userName.toLowerCase().includes(searchLower) ||
+                accountName.toLowerCase().includes(searchLower) ||
+                pi.id.toLowerCase().includes(searchLower);
+              
+              if (!matchesSearch) {
+                return null;
+              }
+            }
+
+            return {
+              id: pi.id,
+              amount: pi.amount,
+              currency: pi.currency,
+              status: refunded ? "refunded" : pi.status,
+              created: pi.created,
+              fiscalYear: paymentFiscalYear || null,
+              accountId: accountId || null,
+              accountName: accountName || null,
+              userId: userId || null,
+              userEmail: userEmail || null,
+              userName: userName || null,
+              description: pi.description,
+              refunded,
+            };
+          })
+      );
+
+      // Filter out nulls and sort by created date descending
+      const payments = enrichedPayments
+        .filter(p => p !== null)
+        .sort((a, b) => b!.created - a!.created);
+
+      res.json({ payments });
+    } catch (error) {
+      console.error("Error getting admin payments from Stripe:", error);
+      res.status(500).json({ error: "Failed to get payments" });
+    }
+  });
+
   // Admin refund payment
   app.post("/api/admin/payments/:paymentIntentId/refund", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
     try {

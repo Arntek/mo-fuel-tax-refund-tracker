@@ -268,6 +268,7 @@ export async function getCustomerInvoices(customerId: string): Promise<Stripe.In
 export async function getAllPayments(limit: number = 100): Promise<Stripe.PaymentIntent[]> {
   const payments = await requireStripe().paymentIntents.list({
     limit,
+    expand: ["data.charges.data.refunds"],
   });
   return payments.data;
 }

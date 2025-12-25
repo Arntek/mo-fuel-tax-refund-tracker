@@ -58,6 +58,22 @@ type AdminAccount = {
   receiptCount: number;
 };
 
+type StripePayment = {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created: number;
+  fiscalYear: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+  description: string | null;
+  refunded: boolean;
+};
+
 export default function Admin() {
   const { toast } = useToast();
   const [newPlan, setNewPlan] = useState({
@@ -110,6 +126,24 @@ export default function Admin() {
     },
   });
 
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ payments: StripePayment[] }>({
+    queryKey: ["/api/admin/payments", selectedFiscalYear, searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedFiscalYear && selectedFiscalYear !== "all") {
+        params.set("fiscalYear", selectedFiscalYear);
+      }
+      if (searchQuery) {
+        params.set("search", searchQuery);
+      }
+      const res = await fetch(`/api/admin/payments?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch payments");
+      return res.json();
+    },
+  });
+  
+  const payments = paymentsData?.payments || [];
+
   const createPlanMutation = useMutation({
     mutationFn: async (data: typeof newPlan) => {
       return apiRequest("/api/admin/plans", {
@@ -152,6 +186,7 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       toast({ title: "Refunded", description: "Payment has been refunded" });
     },
@@ -339,7 +374,7 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle>Payment Management</CardTitle>
                 <CardDescription>
-                  View and manage account payments. Filter by fiscal year or search by name/email.
+                  View and manage all Stripe payments. Filter by fiscal year or search by name/email.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -365,65 +400,73 @@ export default function Admin() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
-                      data-testid="input-search-accounts"
+                      data-testid="input-search-payments"
                     />
                   </div>
                 </div>
 
-                {accountsLoading ? (
+                {paymentsLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : accounts.length === 0 ? (
+                ) : payments.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No accounts found matching your criteria.
+                    No payments found matching your criteria.
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Payment ID</TableHead>
                         <TableHead>Account</TableHead>
-                        <TableHead>Owner</TableHead>
+                        <TableHead>User</TableHead>
                         <TableHead>Fiscal Year</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Paid Date</TableHead>
-                        <TableHead className="text-center">Receipts</TableHead>
+                        <TableHead>Date</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {accounts.map((account, idx) => (
-                        <TableRow key={`${account.id}-${account.fiscalYear}-${idx}`} data-testid={`row-account-${account.id}`}>
-                          <TableCell className="font-medium">{account.name}</TableCell>
-                          <TableCell>
-                            <div>{account.ownerName}</div>
-                            <div className="text-xs text-muted-foreground">{account.ownerEmail}</div>
+                      {payments.map((payment) => (
+                        <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
+                          <TableCell className="font-mono text-xs">
+                            {payment.id.slice(0, 20)}...
                           </TableCell>
-                          <TableCell>{account.fiscalYear}</TableCell>
+                          <TableCell className="font-medium">
+                            {payment.accountName || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div>{payment.userName || "-"}</div>
+                            <div className="text-xs text-muted-foreground">{payment.userEmail || "-"}</div>
+                          </TableCell>
+                          <TableCell>{payment.fiscalYear || "-"}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${(payment.amount / 100).toFixed(2)}
+                          </TableCell>
                           <TableCell>
                             <Badge variant={
-                              account.status === "active" ? "default" :
-                              account.status === "trial" ? "secondary" :
+                              payment.refunded ? "destructive" :
+                              payment.status === "succeeded" ? "default" :
                               "outline"
                             }>
-                              {account.status === "active" ? "Paid" :
-                               account.status === "trial" ? "Trial" :
-                               account.status}
+                              {payment.refunded ? "Refunded" :
+                               payment.status === "succeeded" ? "Paid" :
+                               payment.status}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {account.paidAt ? format(new Date(account.paidAt), "MMM d, yyyy") : "-"}
+                            {format(new Date(payment.created * 1000), "MMM d, yyyy")}
                           </TableCell>
-                          <TableCell className="text-center">{account.receiptCount}</TableCell>
                           <TableCell className="text-right">
-                            {account.stripePaymentIntentId && (
+                            {!payment.refunded && payment.status === "succeeded" && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="gap-1"
-                                onClick={() => handleRefund(account.stripePaymentIntentId!, account.name)}
+                                onClick={() => handleRefund(payment.id, payment.accountName || payment.userEmail || "this payment")}
                                 disabled={refundMutation.isPending}
-                                data-testid={`button-refund-${account.id}`}
+                                data-testid={`button-refund-${payment.id}`}
                               >
                                 {refundMutation.isPending ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />
