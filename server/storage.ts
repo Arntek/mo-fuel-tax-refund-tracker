@@ -90,6 +90,7 @@ export interface IStorage {
   getAccountReceipts(accountId: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
   getAccountReceiptsForUser(accountId: string, userId: string, role: string): Promise<(Receipt & { uploadedByUser: User; vehicle: Vehicle | null })[]>;
   getReceipt(id: string): Promise<Receipt | undefined>;
+  getReceiptByImagePath(imagePath: string): Promise<Receipt | undefined>;
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
   updateReceipt(id: string, updates: Partial<InsertReceipt>): Promise<Receipt | undefined>;
   deleteReceipt(id: string): Promise<boolean>;
@@ -486,6 +487,14 @@ export class DbStorage implements IStorage {
 
   async getReceipt(id: string): Promise<Receipt | undefined> {
     const [receipt] = await db.select().from(schema.receipts).where(eq(schema.receipts.id, id)).limit(1);
+    return receipt;
+  }
+
+  async getReceiptByImagePath(imagePath: string): Promise<Receipt | undefined> {
+    // Find receipt by matching the image URL which contains the object path
+    const [receipt] = await db.select().from(schema.receipts).where(
+      sql`${schema.receipts.imageUrl} LIKE ${'%' + imagePath.split('/').pop() + '%'}`
+    ).limit(1);
     return receipt;
   }
 

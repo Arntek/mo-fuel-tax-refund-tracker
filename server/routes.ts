@@ -78,9 +78,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const objectStorageService = new ObjectStorageService();
 
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  app.get("/objects/:objectPath(*)", async (req: any, res) => {
     try {
+      // Get session from cookie
+      const sessionId = req.cookies?.sessionId;
+      const userId = await getUserFromSession(sessionId);
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized - authentication required" });
+      }
+      
       const objectPath = await objectStorageService.getObjectEntityFile(req.path);
+      
+      // Extract accountId from the object path (.private/{accountId}/receipts/{uuid})
+      const pathParts = objectPath.split('/');
+      if (pathParts.length < 4 || pathParts[0] !== '.private') {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const accountId = pathParts[1];
+      
+      // Verify user is a member of the account that owns this object
+      const isMember = await storage.isUserAccountMember(accountId, userId);
+      if (!isMember) {
+        return res.status(403).json({ error: "Access denied - not authorized to access this resource" });
+      }
+      
+      // For members (not admin/owner), verify they can access this specific receipt
+      const role = await storage.getUserRole(accountId, userId);
+      if (role === 'member') {
+        const receipt = await storage.getReceiptByImagePath(objectPath);
+        if (!receipt) {
+          return res.status(404).json({ error: "Receipt not found" });
+        }
+        
+        // Members can access if they uploaded OR the receipt is for an assigned vehicle
+        if (receipt.uploadedBy !== userId) {
+          if (receipt.vehicleId) {
+            const vehicleMembers = await storage.getVehicleMembers(receipt.vehicleId);
+            const isAssigned = vehicleMembers.some(vm => vm.userId === userId);
+            if (!isAssigned) {
+              return res.status(403).json({ error: "Access denied - you can only view your own receipts or receipts for your assigned vehicles" });
+            }
+          } else {
+            return res.status(403).json({ error: "Access denied - you can only view your own receipts" });
+          }
+        }
+      }
+      
       await objectStorageService.downloadObject(objectPath, res);
     } catch (error) {
       console.error("Error accessing object:", error);
@@ -404,6 +448,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (vehicle.accountId !== req.accountId) {
         return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Check role-based access - members can only view assigned vehicles
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      if (role === 'member') {
+        const vehicleMembers = await storage.getVehicleMembers(id);
+        const isAssigned = vehicleMembers.some(vm => vm.userId === req.userId);
+        if (!isAssigned) {
+          return res.status(403).json({ error: "Access denied - vehicle not assigned to you" });
+        }
       }
       
       res.json(vehicle);
@@ -774,6 +828,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
+      // Check role-based access - members can only update their own receipts
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      if (role === 'member' && existing.uploadedBy !== req.userId) {
+        return res.status(403).json({ error: "Access denied - you can only edit your own receipts" });
+      }
+
       const rawUpdates = req.body;
       
       if (rawUpdates.gallons !== undefined) {
@@ -820,6 +880,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
+      // Check role-based access for members
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      if (role === 'member') {
+        // Members can only see their own receipts or receipts for their assigned vehicles
+        if (receipt.uploadedBy !== req.userId) {
+          // Check if the receipt is for an assigned vehicle
+          if (receipt.vehicleId) {
+            const vehicleMembers = await storage.getVehicleMembers(receipt.vehicleId);
+            const isAssigned = vehicleMembers.some(vm => vm.userId === req.userId);
+            if (!isAssigned) {
+              return res.status(403).json({ error: "Access denied - you can only view your own receipts" });
+            }
+          } else {
+            return res.status(403).json({ error: "Access denied - you can only view your own receipts" });
+          }
+        }
+      }
+
       // Calculate tax refund if the receipt is processed
       if (receipt.processingStatus === "completed" && receipt.gallons && receipt.date) {
         const taxInfo = await calculateReceiptTaxRefund(receipt);
@@ -845,6 +923,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (receipt.accountId !== req.accountId) {
         return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Check role-based access - members can only delete their own receipts
+      const role = await storage.getUserRole(req.accountId, req.userId);
+      if (role === 'member' && receipt.uploadedBy !== req.userId) {
+        return res.status(403).json({ error: "Access denied - you can only delete your own receipts" });
       }
 
       // Delete image from object storage FIRST before deleting DB entry
