@@ -8,7 +8,21 @@ This is a multi-tenant web application for managing gas station receipts for Mis
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (November 22, 2025)
+## Recent Changes (December 26, 2025)
+
+### Security Enhancements
+- **Receipt Image Access Control**: `/objects` endpoint now requires authentication and enforces role-based access - members can only download images for receipts they uploaded or for assigned vehicles
+- **Receipt CRUD Access Control**: PUT/DELETE receipt routes verify ownership - members can only modify their own receipts
+- **Vehicle Access Control**: Vehicle by ID endpoint checks membership assignment for member role users
+- **Data Encryption at Rest**: Added `server/encryption.ts` with AES-256-GCM encryption:
+  - SSNs encrypted with random IV for maximum security
+  - VINs encrypted with random IV plus HMAC-SHA256 search hash for secure lookups
+  - Requires `ENCRYPTION_KEY` environment variable in production (32+ characters)
+  - Utility functions for masking SSNs (XXX-XX-1234 format)
+
+---
+
+## Previous Changes (November 22, 2025)
 
 ### Vehicle Management Enhancements
 - **Vehicle Nicknames**: Added optional nickname field to vehicles for user-friendly identification (e.g., "Mom's Truck" instead of "2015 Ford F-150")
