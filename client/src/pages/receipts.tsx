@@ -5,7 +5,7 @@ import { ReceiptTable } from "@/components/receipt-table";
 import { DashboardSummary } from "@/components/dashboard-summary";
 import { ExportSection } from "@/components/export-section";
 import { DeadlineBanner } from "@/components/deadline-banner";
-import { AccountHeader } from "@/components/account-header";
+import { AccountLayout } from "@/components/account-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -99,8 +99,7 @@ export default function Receipts() {
 
   if (accountError || !account) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <AccountHeader account={account} accountId={accountId} />
+      <AccountLayout accountId={accountId}>
         <main className="flex-1 flex items-center justify-center">
           <Card className="max-w-md w-full mx-4">
             <CardHeader>
@@ -118,14 +117,12 @@ export default function Receipts() {
             </CardContent>
           </Card>
         </main>
-      </div>
+      </AccountLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <AccountHeader account={account} accountId={accountId} />
-
+    <AccountLayout accountId={accountId}>
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
@@ -241,6 +238,6 @@ export default function Receipts() {
         {/* Export Section */}
         <ExportSection receipts={receipts} />
       </main>
-    </div>
+    </AccountLayout>
   );
 }

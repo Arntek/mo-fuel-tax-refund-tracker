@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, CreditCard, Receipt, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText } from "lucide-react";
+import { AccountLayout } from "@/components/account-layout";
+import { CreditCard, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText, Receipt } from "lucide-react";
 import type { Account, FiscalYearPlan } from "@shared/schema";
 
 type SubscriptionStatus = {
@@ -138,23 +138,12 @@ export default function Billing() {
   const trialProgress = subscriptionStatus ? Math.min(100, (subscriptionStatus.receiptCount / 8) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href={`/dashboard/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-semibold">Billing & Subscription</h1>
-          </div>
-        </div>
-        <ThemeToggle />
-      </header>
-
+    <AccountLayout accountId={accountId}>
       <main className="container max-w-4xl mx-auto py-8 px-4 space-y-6">
+        <div className="flex items-center gap-2 mb-4">
+          <CreditCard className="w-5 h-5 text-primary" />
+          <h1 className="text-lg font-semibold">Billing & Subscription</h1>
+        </div>
         {account && (
           <div className="mb-4">
             <p className="text-sm text-muted-foreground">
@@ -397,7 +386,7 @@ export default function Billing() {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </AccountLayout>
   );
 }
 

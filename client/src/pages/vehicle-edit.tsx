@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AccountHeader } from "@/components/account-header";
+import { AccountLayout } from "@/components/account-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,8 +131,7 @@ export default function VehicleEdit() {
 
   if (accountError || !account || !vehicle) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <AccountHeader account={account} accountId={accountId} />
+      <AccountLayout accountId={accountId}>
         <main className="flex-1 flex items-center justify-center">
           <Card className="max-w-md w-full mx-4">
             <CardHeader>
@@ -150,21 +149,14 @@ export default function VehicleEdit() {
             </CardContent>
           </Card>
         </main>
-      </div>
+      </AccountLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <AccountHeader account={account} accountId={accountId} />
-
+    <AccountLayout accountId={accountId}>
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full space-y-6">
         <div className="flex items-center gap-2">
-          <Link href={`/vehicles/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
           <h1 className="text-2xl font-bold">Edit Vehicle</h1>
         </div>
 
@@ -277,6 +269,6 @@ export default function VehicleEdit() {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </AccountLayout>
   );
 }

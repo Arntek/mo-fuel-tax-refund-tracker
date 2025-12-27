@@ -28,7 +28,7 @@ import {
 type Account = any;
 
 interface AccountLayoutProps {
-  accountId: number;
+  accountId: string;
   children: React.ReactNode;
   settingsContent?: React.ReactNode;
 }

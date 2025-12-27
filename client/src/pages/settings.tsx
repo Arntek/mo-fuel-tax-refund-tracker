@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AccountHeader } from "@/components/account-header";
+import { AccountLayout } from "@/components/account-layout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -160,8 +160,7 @@ export default function Settings() {
 
   if (accountError || !account) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <AccountHeader account={account} accountId={accountId} />
+      <AccountLayout accountId={accountId}>
         <main className="flex-1 flex items-center justify-center">
           <Card className="max-w-md w-full mx-4">
             <CardHeader>
@@ -179,23 +178,13 @@ export default function Settings() {
             </CardContent>
           </Card>
         </main>
-      </div>
+      </AccountLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <AccountHeader account={account} accountId={accountId} />
-
+    <AccountLayout accountId={accountId}>
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full">
-        <div className="mb-6">
-          <Link href={`/dashboard/${accountId}`}>
-            <Button variant="ghost" size="sm" className="gap-2" data-testid="button-back">
-              <ChevronLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
 
         <div className="space-y-6">
           <div>
@@ -465,6 +454,6 @@ export default function Settings() {
           </div>
         </div>
       </main>
-    </div>
+    </AccountLayout>
   );
 }
