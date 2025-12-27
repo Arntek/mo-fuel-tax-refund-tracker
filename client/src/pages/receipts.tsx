@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Helmet } from "react-helmet";
 
 type Receipt = any;
 type Account = any;
@@ -119,6 +120,10 @@ export default function Receipts() {
 
   return (
     <>
+      <Helmet>
+        <title>Manage Receipts - Gas Receipt Tax Refund</title>
+        <meta name="description" content="View and manage your gas station receipts for the current fiscal year." />
+      </Helmet>
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">

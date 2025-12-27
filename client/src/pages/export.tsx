@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import type { Account, Receipt } from "@shared/schema";
+import { Helmet } from "react-helmet";
 
 export default function Export() {
   const { accountId } = useParams<{ accountId: string }>();
@@ -79,9 +80,15 @@ export default function Export() {
   }
 
   return (
-    <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
+    <>
+      <Helmet>
+        <title>Export Data - Gas Receipt Tax Refund</title>
+        <meta name="description" content="Export your gas receipt data for tax filing." />
+      </Helmet>
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
       <h2 className="text-2xl font-semibold">Export Data</h2>
       <ExportSection receipts={receipts} />
     </main>
+    </>
   );
 }

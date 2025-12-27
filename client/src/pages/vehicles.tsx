@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Account, Vehicle } from "@shared/schema";
+import { Helmet } from "react-helmet";
 
 export default function Vehicles() {
   const params = useParams();
@@ -184,6 +185,10 @@ export default function Vehicles() {
 
   return (
     <>
+      <Helmet>
+        <title>Vehicles - Gas Receipt Tax Refund</title>
+        <meta name="description" content="Manage your vehicles for tax refund tracking." />
+      </Helmet>
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold">Vehicles</h1>

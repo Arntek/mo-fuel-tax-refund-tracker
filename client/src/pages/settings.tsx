@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Account, User } from "@shared/schema";
+import { Helmet } from "react-helmet";
 
 // Helper functions for obfuscation
 function obfuscateSSN(ssn: string): string {
@@ -181,6 +182,10 @@ export default function Settings() {
 
   return (
     <>
+      <Helmet>
+        <title>Account Settings - Gas Receipt Tax Refund</title>
+        <meta name="description" content="Update your account details and tax form information." />
+      </Helmet>
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
 
         <div className="space-y-6">

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Car, Check, Loader2, AlertTriangle, CreditCard } from "lucide-react";
 import { Receipt } from "@shared/schema";
+import { Helmet } from "react-helmet";
 
 type SubscriptionStatus = {
   status: "trial" | "active" | "expired" | "cancelled";
@@ -143,6 +144,10 @@ export default function Upload() {
 
   return (
     <>
+      <Helmet>
+        <title>Upload Receipts - Gas Receipt Tax Refund</title>
+        <meta name="description" content="Upload and process gas station receipts for tax refund filing." />
+      </Helmet>
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">

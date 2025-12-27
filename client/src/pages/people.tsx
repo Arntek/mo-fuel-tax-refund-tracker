@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Account, AccountMember, User, Vehicle, VehicleMember, Invitation } from "@shared/schema";
 import { Mail, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { Helmet } from "react-helmet";
 
 type MemberWithUser = AccountMember & { user: User };
 
@@ -280,6 +281,10 @@ export default function People() {
 
   return (
     <>
+      <Helmet>
+        <title>Manage People - Gas Receipt Tax Refund</title>
+        <meta name="description" content="Manage account members and invitations." />
+      </Helmet>
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold">People</h1>
