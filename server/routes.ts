@@ -1198,6 +1198,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== DISCOUNT CODES ====================
+
+  // Get all discount codes (admin only)
+  app.get("/api/admin/discount-codes", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const codes = await storage.getAllDiscountCodes();
+      res.json({ codes });
+    } catch (error) {
+      console.error("Error getting discount codes:", error);
+      res.status(500).json({ error: "Failed to get discount codes" });
+    }
+  });
+
+  // Create a discount code (admin only)
+  app.post("/api/admin/discount-codes", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const { code, description, discountType, discountValue, maxRedemptions, fiscalYear, expiresAt } = req.body;
+      
+      if (!code || !discountType || discountValue === undefined) {
+        return res.status(400).json({ error: "Code, discountType, and discountValue are required" });
+      }
+      
+      // Check if code already exists
+      const existing = await storage.getDiscountCodeByCode(code.toUpperCase());
+      if (existing) {
+        return res.status(400).json({ error: "A discount code with this code already exists" });
+      }
+      
+      let stripeCouponId: string | null = null;
+      let stripePromotionCodeId: string | null = null;
+      
+      // Create Stripe coupon and promotion code
+      if (stripeService.isStripeConfigured()) {
+        try {
+          const stripeResult = await stripeService.createStripeCoupon({
+            discountType: discountType as "percentage" | "fixed",
+            discountValue: discountType === "percentage" ? discountValue : discountValue,
+            code: code.toUpperCase(),
+            description,
+          });
+          stripeCouponId = stripeResult.couponId;
+          stripePromotionCodeId = stripeResult.promotionCodeId;
+        } catch (stripeError: any) {
+          console.error("Error creating Stripe coupon:", stripeError);
+          return res.status(500).json({ error: `Stripe error: ${stripeError.message}` });
+        }
+      }
+      
+      const discountCode = await storage.createDiscountCode({
+        code: code.toUpperCase(),
+        description,
+        discountType,
+        discountValue,
+        maxRedemptions: maxRedemptions || null,
+        fiscalYear: fiscalYear || null,
+        stripeCouponId,
+        stripePromotionCodeId,
+        active: true,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+      
+      console.log(`[Admin] Created discount code ${code} by admin ${req.userId}`);
+      res.json({ discountCode });
+    } catch (error) {
+      console.error("Error creating discount code:", error);
+      res.status(500).json({ error: "Failed to create discount code" });
+    }
+  });
+
+  // Deactivate a discount code (admin only)
+  app.put("/api/admin/discount-codes/:id/deactivate", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const discountCode = await storage.getDiscountCodeById(req.params.id);
+      
+      if (!discountCode) {
+        return res.status(404).json({ error: "Discount code not found" });
+      }
+      
+      // Deactivate in Stripe if applicable
+      if (discountCode.stripeCouponId && stripeService.isStripeConfigured()) {
+        try {
+          await stripeService.deactivateStripeCoupon(discountCode.stripeCouponId);
+        } catch (stripeError: any) {
+          console.error("Error deactivating Stripe coupon:", stripeError);
+        }
+      }
+      
+      const updated = await storage.deactivateDiscountCode(req.params.id);
+      console.log(`[Admin] Deactivated discount code ${discountCode.code} by admin ${req.userId}`);
+      res.json({ discountCode: updated });
+    } catch (error) {
+      console.error("Error deactivating discount code:", error);
+      res.status(500).json({ error: "Failed to deactivate discount code" });
+    }
+  });
+
+  // Get discount code redemptions (admin only)
+  app.get("/api/admin/discount-codes/:id/redemptions", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const redemptions = await storage.getDiscountCodeRedemptions(req.params.id);
+      res.json({ redemptions });
+    } catch (error) {
+      console.error("Error getting discount code redemptions:", error);
+      res.status(500).json({ error: "Failed to get redemptions" });
+    }
+  });
+
+  // Validate a discount code (public - used during checkout)
+  app.get("/api/discount-codes/validate", authMiddleware, async (req: any, res) => {
+    try {
+      const { code, fiscalYear } = req.query;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Code is required" });
+      }
+      
+      const discountCode = await storage.getDiscountCodeByCode((code as string).toUpperCase());
+      
+      if (!discountCode) {
+        return res.json({ valid: false, error: "Invalid discount code" });
+      }
+      
+      if (!discountCode.active) {
+        return res.json({ valid: false, error: "This discount code is no longer active" });
+      }
+      
+      if (discountCode.expiresAt && new Date() > discountCode.expiresAt) {
+        return res.json({ valid: false, error: "This discount code has expired" });
+      }
+      
+      if (discountCode.maxRedemptions && discountCode.redemptionCount >= discountCode.maxRedemptions) {
+        return res.json({ valid: false, error: "This discount code has reached its maximum redemptions" });
+      }
+      
+      if (discountCode.fiscalYear && fiscalYear && discountCode.fiscalYear !== fiscalYear) {
+        return res.json({ valid: false, error: "This discount code is not valid for the selected fiscal year" });
+      }
+      
+      res.json({
+        valid: true,
+        discountCode: {
+          id: discountCode.id,
+          code: discountCode.code,
+          description: discountCode.description,
+          discountType: discountCode.discountType,
+          discountValue: discountCode.discountValue,
+        },
+      });
+    } catch (error) {
+      console.error("Error validating discount code:", error);
+      res.status(500).json({ error: "Failed to validate discount code" });
+    }
+  });
+
+  // Sync payments to ledger (admin only)
+  app.post("/api/admin/sync-payments", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ error: "Stripe not configured" });
+      }
+      
+      const result = await stripeService.syncPaymentsToLedger();
+      console.log(`[Admin] Synced ${result.synced} payments to ledger by admin ${req.userId}`);
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing payments:", error);
+      res.status(500).json({ error: "Failed to sync payments" });
+    }
+  });
+
+  // Get ledger stats (admin only)
+  app.get("/api/admin/ledger-stats", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const { fiscalYear } = req.query;
+      const stats = await storage.getLedgerStats(fiscalYear as string | undefined);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting ledger stats:", error);
+      res.status(500).json({ error: "Failed to get ledger stats" });
+    }
+  });
+
+  // Get all ledger entries (admin only)
+  app.get("/api/admin/ledger", authMiddleware, siteAdminMiddleware, async (req: any, res) => {
+    try {
+      const { fiscalYear } = req.query;
+      const entries = await storage.getAllPaymentLedgerEntries(fiscalYear as string | undefined);
+      res.json({ entries });
+    } catch (error) {
+      console.error("Error getting ledger entries:", error);
+      res.status(500).json({ error: "Failed to get ledger entries" });
+    }
+  });
+
   // ==================== BILLING ROUTES ====================
 
   app.get("/api/accounts/:accountId/subscription", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {

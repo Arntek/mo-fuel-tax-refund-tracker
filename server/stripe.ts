@@ -542,4 +542,62 @@ export function getStripe(): Stripe {
   return requireStripe();
 }
 
+export async function createStripeCoupon(params: {
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  code: string;
+  description?: string;
+}): Promise<{ couponId: string; promotionCodeId: string }> {
+  const stripeInstance = requireStripe();
+  
+  // Create the coupon
+  const couponParams: Stripe.CouponCreateParams = {
+    duration: "once",
+    metadata: { code: params.code },
+  };
+  
+  if (params.discountType === "percentage") {
+    couponParams.percent_off = params.discountValue;
+  } else {
+    couponParams.amount_off = params.discountValue;
+    couponParams.currency = "usd";
+  }
+  
+  if (params.description) {
+    couponParams.name = params.description;
+  }
+  
+  const coupon = await stripeInstance.coupons.create(couponParams);
+  
+  // Create a promotion code for this coupon
+  const promotionCode = await stripeInstance.promotionCodes.create({
+    promotion: {
+      type: "coupon",
+      coupon: coupon.id,
+    },
+    code: params.code,
+    active: true,
+  });
+  
+  return {
+    couponId: coupon.id,
+    promotionCodeId: promotionCode.id,
+  };
+}
+
+export async function deactivateStripeCoupon(couponId: string): Promise<void> {
+  const stripeInstance = requireStripe();
+  await stripeInstance.coupons.del(couponId);
+}
+
+export async function getStripePromotionCode(code: string): Promise<Stripe.PromotionCode | null> {
+  const stripeInstance = requireStripe();
+  const promotionCodes = await stripeInstance.promotionCodes.list({
+    code,
+    active: true,
+    limit: 1,
+  });
+  return promotionCodes.data[0] || null;
+}
+
 export { stripe };
