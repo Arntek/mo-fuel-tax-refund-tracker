@@ -86,34 +86,34 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
   const menuItems = [
     {
       title: "Dashboard",
-      url: `/dashboard/${accountId}`,
+      url: accountId ? `/dashboard/${accountId}` : "#",
       icon: LayoutDashboard,
       testId: "button-dashboard",
     },
     {
       title: "Receipts",
-      url: `/receipts/${accountId}`,
+      url: accountId ? `/receipts/${accountId}` : "#",
       icon: Receipt,
       testId: "button-receipts",
     },
     ...(isAdminOrOwner ? [
       {
         title: "People",
-        url: `/people/${accountId}`,
+        url: accountId ? `/people/${accountId}` : "#",
         icon: Users,
         testId: "button-people",
       },
     ] : []),
     {
       title: "Vehicles",
-      url: `/vehicles/${accountId}`,
+      url: accountId ? `/vehicles/${accountId}` : "#",
       icon: Car,
       testId: "button-vehicles",
     },
     ...(isAdminOrOwner ? [
       {
         title: "Billing",
-        url: `/billing/${accountId}`,
+        url: accountId ? `/billing/${accountId}` : "#",
         icon: CreditCard,
         testId: "button-billing",
       },
