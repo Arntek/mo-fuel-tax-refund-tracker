@@ -270,6 +270,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending invitations for logged-in user
+  app.get("/api/invitations", authMiddleware, async (req: any, res) => {
+    try {
+      const user = await storage.getUserById(req.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const invitations = await storage.getInvitationsByEmail(user.email);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error getting invitations:", error);
+      res.status(500).json({ error: "Failed to get invitations" });
+    }
+  });
+
+  // Accept an invitation
+  app.post("/api/invitations/:invitationId/accept", authMiddleware, async (req: any, res) => {
+    try {
+      const invitation = await storage.getInvitationById(req.params.invitationId);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+      
+      // Verify this invitation is for the current user's email
+      const user = await storage.getUserById(req.userId);
+      if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+        return res.status(403).json({ error: "This invitation is not for you" });
+      }
+      
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitation is no longer pending" });
+      }
+      
+      // Check if invitation has expired
+      if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+        await storage.updateInvitationStatus(invitation.id, "expired");
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+      
+      // Check if user is already a member
+      const existingMember = await storage.isUserAccountMember(invitation.accountId, req.userId);
+      if (existingMember) {
+        await storage.updateInvitationStatus(invitation.id, "accepted");
+        return res.status(409).json({ error: "You are already a member of this account" });
+      }
+      
+      // Create membership
+      await storage.addAccountMember({
+        accountId: invitation.accountId,
+        userId: req.userId,
+        role: invitation.role,
+      });
+      
+      // Update invitation status
+      const updated = await storage.updateInvitationStatus(invitation.id, "accepted");
+      
+      res.json({ message: "Invitation accepted", invitation: updated });
+    } catch (error) {
+      console.error("Error accepting invitation:", error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  // Reject an invitation
+  app.post("/api/invitations/:invitationId/reject", authMiddleware, async (req: any, res) => {
+    try {
+      const invitation = await storage.getInvitationById(req.params.invitationId);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+      
+      // Verify this invitation is for the current user's email
+      const user = await storage.getUserById(req.userId);
+      if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+        return res.status(403).json({ error: "This invitation is not for you" });
+      }
+      
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Invitation is no longer pending" });
+      }
+      
+      // Update invitation status
+      const updated = await storage.updateInvitationStatus(invitation.id, "rejected");
+      
+      res.json({ message: "Invitation rejected", invitation: updated });
+    } catch (error) {
+      console.error("Error rejecting invitation:", error);
+      res.status(500).json({ error: "Failed to reject invitation" });
+    }
+  });
+
   app.get("/api/accounts", authMiddleware, async (req: any, res) => {
     try {
       const accounts = await storage.getUserAccounts(req.userId);
@@ -336,7 +430,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/accounts/:accountId/members", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+  // Create invitation to join account (replaces direct member addition)
+  app.post("/api/accounts/:accountId/invitations", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const { email, role } = req.body;
       
@@ -344,34 +439,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email required" });
       }
       
-      let user = await storage.getUserByEmail(email);
+      const normalizedEmail = email.toLowerCase().trim();
       
-      if (!user) {
-        // Auto-create user if they don't exist
-        const emailParts = email.split('@')[0];
-        user = await storage.createUser({
-          email,
-          firstName: emailParts,
-          lastName: "",
-        });
+      // Check if user is already a member
+      const existingUser = await storage.getUserByEmail(normalizedEmail);
+      if (existingUser) {
+        const existingMember = await storage.isUserAccountMember(req.accountId, existingUser.id);
+        if (existingMember) {
+          return res.status(409).json({ error: "User is already a member of this account" });
+        }
       }
       
-      const existingMember = await storage.isUserAccountMember(req.accountId, user.id);
-      
-      if (existingMember) {
-        return res.status(409).json({ error: "User is already a member" });
+      // Check if there's already a pending invitation
+      const existingInvitation = await storage.getPendingInvitation(req.accountId, normalizedEmail);
+      if (existingInvitation) {
+        return res.status(409).json({ error: "There is already a pending invitation for this email" });
       }
       
-      const member = await storage.addAccountMember({
+      // Get account and inviter info for email
+      const account = await storage.getAccountById(req.accountId);
+      const inviter = await storage.getUserById(req.userId);
+      
+      // Create the invitation
+      const invitation = await storage.createInvitation({
         accountId: req.accountId,
-        userId: user.id,
+        email: normalizedEmail,
         role: role || "member",
+        invitedBy: req.userId,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       });
       
-      res.json(member);
+      // Send invitation email
+      const { sendInvitationEmail } = await import("./auth");
+      const inviterName = inviter ? `${inviter.firstName || ""} ${inviter.lastName || ""}`.trim() : undefined;
+      await sendInvitationEmail(normalizedEmail, account?.name || "Unknown Account", role || "member", inviterName);
+      
+      res.json(invitation);
     } catch (error) {
-      console.error("Error adding member:", error);
-      res.status(500).json({ error: "Failed to add member" });
+      console.error("Error creating invitation:", error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  // Get account invitations (for people management page)
+  app.get("/api/accounts/:accountId/invitations", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      const invitations = await storage.getAccountInvitations(req.accountId);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error getting invitations:", error);
+      res.status(500).json({ error: "Failed to get invitations" });
+    }
+  });
+
+  // Revoke an invitation
+  app.delete("/api/accounts/:accountId/invitations/:invitationId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      const invitation = await storage.getInvitationById(req.params.invitationId);
+      
+      if (!invitation || invitation.accountId !== req.accountId) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+      
+      if (invitation.status !== "pending") {
+        return res.status(400).json({ error: "Can only revoke pending invitations" });
+      }
+      
+      const revoked = await storage.revokeInvitation(req.params.invitationId);
+      res.json(revoked);
+    } catch (error) {
+      console.error("Error revoking invitation:", error);
+      res.status(500).json({ error: "Failed to revoke invitation" });
     }
   });
 

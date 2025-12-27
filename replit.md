@@ -10,6 +10,21 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (December 27, 2025)
 
+### Invitation-Based Membership System
+- **Email-Based Invitations**: Account owners/admins now send invitations by email rather than directly adding members
+- **Invitation Flow**: Create invitation → Send email via SendGrid → User accepts/rejects after login
+- **Status Tracking**: Invitations have status (pending, accepted, rejected, revoked, expired)
+- **User Consent**: Users must accept invitations before joining an account - invitations shown on accounts page
+- **Revocation**: Account admins can revoke pending invitations
+- **Schema**: New `invitations` table with accountId, email, role, status, invitedBy, expiresAt
+- **Endpoints**:
+  - `POST /api/accounts/:accountId/invitations` - Create invitation (sends email)
+  - `GET /api/accounts/:accountId/invitations` - List account invitations
+  - `DELETE /api/accounts/:accountId/invitations/:id` - Revoke invitation
+  - `GET /api/invitations` - Get user's pending invitations
+  - `POST /api/invitations/:id/accept` - Accept invitation (creates membership)
+  - `POST /api/invitations/:id/reject` - Reject invitation
+
 ### Discount Code System
 - **Discount Code Management**: Admin can create, list, and deactivate discount codes
 - **Stripe Integration**: Discount codes sync with Stripe coupons and promotion codes

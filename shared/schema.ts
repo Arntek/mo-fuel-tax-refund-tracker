@@ -231,6 +231,21 @@ export const insertAccountSubscriptionSchema = createInsertSchema(accountSubscri
   createdAt: true,
 });
 
+export const invitations = pgTable("invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).notNull().default("member"),
+  status: varchar("status", { length: 50 }).notNull().default("pending"),
+  invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  accountEmailIdx: index("invitation_account_email_idx").on(table.accountId, table.email),
+  emailIdx: index("invitation_email_idx").on(table.email),
+  statusIdx: index("invitation_status_idx").on(table.status),
+}));
+
 export const discountCodes = pgTable("discount_codes", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: varchar("code", { length: 50 }).notNull().unique(),
@@ -288,6 +303,11 @@ export const paymentLedger = pgTable("payment_ledger", {
   fiscalYearIdx: index("payment_ledger_fy_idx").on(table.fiscalYear),
 }));
 
+export const insertInvitationSchema = createInsertSchema(invitations).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
   id: true,
   createdAt: true,
@@ -337,6 +357,9 @@ export type InsertFiscalYearPlan = z.infer<typeof insertFiscalYearPlanSchema>;
 
 export type AccountSubscription = typeof accountSubscriptions.$inferSelect;
 export type InsertAccountSubscription = z.infer<typeof insertAccountSubscriptionSchema>;
+
+export type Invitation = typeof invitations.$inferSelect;
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
 
 export type DiscountCode = typeof discountCodes.$inferSelect;
 export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;

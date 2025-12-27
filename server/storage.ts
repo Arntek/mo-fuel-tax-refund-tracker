@@ -30,6 +30,8 @@ import {
   type InsertDiscountCodeRedemption,
   type PaymentLedgerEntry,
   type InsertPaymentLedgerEntry,
+  type Invitation,
+  type InsertInvitation,
 } from "@shared/schema";
 import ws from "ws";
 
@@ -100,6 +102,14 @@ export interface IStorage {
   createReceipt(receipt: InsertReceipt): Promise<Receipt>;
   updateReceipt(id: string, updates: Partial<InsertReceipt>): Promise<Receipt | undefined>;
   deleteReceipt(id: string): Promise<boolean>;
+  // Invitation operations
+  createInvitation(invitation: InsertInvitation): Promise<Invitation>;
+  getInvitationById(id: string): Promise<Invitation | undefined>;
+  getInvitationsByEmail(email: string): Promise<(Invitation & { account: Account })[]>;
+  getAccountInvitations(accountId: string): Promise<Invitation[]>;
+  getPendingInvitation(accountId: string, email: string): Promise<Invitation | undefined>;
+  updateInvitationStatus(id: string, status: string): Promise<Invitation | undefined>;
+  revokeInvitation(id: string): Promise<Invitation | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -642,7 +652,7 @@ export class DbStorage implements IStorage {
     const [redemptionStats] = await redemptionsQuery;
 
     return {
-      totalRevenue: ledgerStats.totalCaptured,
+      totalRevenue: ledgerStats.totalRevenue,
       netRevenue: ledgerStats.netRevenue,
       totalRefunded: ledgerStats.totalRefunded,
       paidAccounts,
@@ -1018,6 +1028,77 @@ export class DbStorage implements IStorage {
       vehicles,
       receiptCount: receiptResult?.count || 0,
     };
+  }
+
+  // Invitation operations
+  async createInvitation(invitation: InsertInvitation): Promise<Invitation> {
+    const [created] = await db.insert(schema.invitations).values({
+      ...invitation,
+      email: invitation.email.toLowerCase().trim(),
+    }).returning();
+    return created;
+  }
+
+  async getInvitationById(id: string): Promise<Invitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(schema.invitations)
+      .where(eq(schema.invitations.id, id))
+      .limit(1);
+    return invitation;
+  }
+
+  async getInvitationsByEmail(email: string): Promise<(Invitation & { account: Account })[]> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const invitations = await db
+      .select({
+        invitation: schema.invitations,
+        account: schema.accounts,
+      })
+      .from(schema.invitations)
+      .innerJoin(schema.accounts, eq(schema.invitations.accountId, schema.accounts.id))
+      .where(and(
+        eq(schema.invitations.email, normalizedEmail),
+        eq(schema.invitations.status, "pending")
+      ))
+      .orderBy(desc(schema.invitations.createdAt));
+    
+    return invitations.map(r => ({ ...r.invitation, account: r.account }));
+  }
+
+  async getAccountInvitations(accountId: string): Promise<Invitation[]> {
+    return db
+      .select()
+      .from(schema.invitations)
+      .where(eq(schema.invitations.accountId, accountId))
+      .orderBy(desc(schema.invitations.createdAt));
+  }
+
+  async getPendingInvitation(accountId: string, email: string): Promise<Invitation | undefined> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const [invitation] = await db
+      .select()
+      .from(schema.invitations)
+      .where(and(
+        eq(schema.invitations.accountId, accountId),
+        eq(schema.invitations.email, normalizedEmail),
+        eq(schema.invitations.status, "pending")
+      ))
+      .limit(1);
+    return invitation;
+  }
+
+  async updateInvitationStatus(id: string, status: string): Promise<Invitation | undefined> {
+    const [updated] = await db
+      .update(schema.invitations)
+      .set({ status })
+      .where(eq(schema.invitations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async revokeInvitation(id: string): Promise<Invitation | undefined> {
+    return this.updateInvitationStatus(id, "revoked");
   }
 }
 

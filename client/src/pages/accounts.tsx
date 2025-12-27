@@ -5,8 +5,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Footer } from "@/components/footer";
-import { Receipt, Users, ChevronRight, LogOut, Plus, ShieldCheck } from "lucide-react";
-import type { User } from "@shared/schema";
+import { Receipt, Users, ChevronRight, LogOut, Plus, ShieldCheck, Mail, Check, X, Loader2 } from "lucide-react";
+import type { User, Invitation, Account as AccountType } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -28,6 +29,8 @@ type Account = {
   memberCount: number;
 };
 
+type InvitationWithAccount = Invitation & { account: AccountType };
+
 export default function Accounts() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -41,6 +44,51 @@ export default function Accounts() {
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
+  });
+
+  const { data: pendingInvitations = [] } = useQuery<InvitationWithAccount[]>({
+    queryKey: ["/api/invitations"],
+  });
+
+  const acceptInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      return apiRequest(`/api/invitations/${invitationId}/accept`, { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      toast({
+        title: "Invitation accepted",
+        description: "You've joined the account!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to accept invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      return apiRequest(`/api/invitations/${invitationId}/reject`, { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invitations"] });
+      toast({
+        title: "Invitation declined",
+        description: "You've declined the invitation",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to decline invitation",
+        variant: "destructive",
+      });
+    },
   });
 
   const createAccountMutation = useMutation({
@@ -130,6 +178,64 @@ export default function Accounts() {
               Choose which account you'd like to access
             </p>
           </div>
+
+          {pendingInvitations.length > 0 && (
+            <Card className="border-primary/50 bg-primary/5">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-primary" />
+                  <CardTitle className="text-lg">Pending Invitations</CardTitle>
+                </div>
+                <CardDescription>
+                  You've been invited to join these accounts
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {pendingInvitations.map((invitation) => (
+                  <div
+                    key={invitation.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-background rounded-lg border"
+                    data-testid={`invitation-${invitation.id}`}
+                  >
+                    <div>
+                      <div className="font-medium">{invitation.account?.name || "Unknown Account"}</div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize">{invitation.role}</Badge>
+                        <span>{invitation.account?.type === "family" ? "Family" : "Business"}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => acceptInvitationMutation.mutate(invitation.id)}
+                        disabled={acceptInvitationMutation.isPending || rejectInvitationMutation.isPending}
+                        data-testid={`button-accept-${invitation.id}`}
+                      >
+                        {acceptInvitationMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 mr-1" />
+                            Accept
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => rejectInvitationMutation.mutate(invitation.id)}
+                        disabled={acceptInvitationMutation.isPending || rejectInvitationMutation.isPending}
+                        data-testid={`button-decline-${invitation.id}`}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-3">
             {user?.isAdmin && (

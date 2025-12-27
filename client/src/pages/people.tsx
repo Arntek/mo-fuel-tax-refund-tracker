@@ -10,7 +10,9 @@ import { AccountHeader } from "@/components/account-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Account, AccountMember, User, Vehicle, VehicleMember } from "@shared/schema";
+import type { Account, AccountMember, User, Vehicle, VehicleMember, Invitation } from "@shared/schema";
+import { Mail, Clock } from "lucide-react";
+import { format } from "date-fns";
 
 type MemberWithUser = AccountMember & { user: User };
 
@@ -50,30 +52,55 @@ export default function People() {
     enabled: !!accountId && isAdminOrOwner,
   });
 
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<Invitation[]>({
+    queryKey: ["/api/accounts", accountId, "invitations"],
+    enabled: !!accountId && isAdminOrOwner,
+  });
+
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [vehicleAssignments, setVehicleAssignments] = useState<Record<string, VehicleMember[]>>({});
 
-  const addMemberMutation = useMutation({
+  const sendInvitationMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/accounts/${accountId}/members`, {
+      return apiRequest(`/api/accounts/${accountId}/invitations`, {
         method: "POST",
         body: JSON.stringify({ email, role }),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "members"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "invitations"] });
       setEmail("");
       toast({
-        title: "Member added",
-        description: "The member has been added to the account",
+        title: "Invitation sent",
+        description: "An email invitation has been sent to join the account",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to add member",
+        description: error.message || "Failed to send invitation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const revokeInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      return apiRequest(`/api/accounts/${accountId}/invitations/${invitationId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "invitations"] });
+      toast({
+        title: "Invitation revoked",
+        description: "The invitation has been cancelled",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to revoke invitation",
         variant: "destructive",
       });
     },
@@ -272,8 +299,8 @@ export default function People() {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Add Member</CardTitle>
-              <CardDescription>Invite someone to join this account</CardDescription>
+              <CardTitle>Invite Member</CardTitle>
+              <CardDescription>Send an email invitation to join this account</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-2">
@@ -298,17 +325,67 @@ export default function People() {
                     </SelectContent>
                   </Select>
                   <Button
-                    onClick={() => addMemberMutation.mutate()}
-                    disabled={!email || addMemberMutation.isPending}
-                    data-testid="button-add-member"
+                    onClick={() => sendInvitationMutation.mutate()}
+                    disabled={!email || sendInvitationMutation.isPending}
+                    data-testid="button-send-invitation"
                     className="shrink-0"
                   >
-                    Add
+                    {sendInvitationMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4 mr-1" />
+                        Invite
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {invitations.filter(inv => inv.status === "pending").length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Pending Invitations
+                </CardTitle>
+                <CardDescription>These people have been invited but haven't responded yet</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {invitations
+                  .filter(inv => inv.status === "pending")
+                  .map(invitation => (
+                    <div
+                      key={invitation.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg"
+                      data-testid={`invitation-${invitation.id}`}
+                    >
+                      <div>
+                        <div className="font-medium">{invitation.email}</div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                          <Badge variant="outline" className="capitalize">{invitation.role}</Badge>
+                          {invitation.createdAt && (
+                            <span>Sent {format(new Date(invitation.createdAt), "MMM d, yyyy")}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => revokeInvitationMutation.mutate(invitation.id)}
+                        disabled={revokeInvitationMutation.isPending}
+                        data-testid={`button-revoke-${invitation.id}`}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Revoke
+                      </Button>
+                    </div>
+                  ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Current Members</h2>
