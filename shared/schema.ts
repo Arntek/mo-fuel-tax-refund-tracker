@@ -253,12 +253,15 @@ export const discountCodeRedemptions = pgTable("discount_code_redemptions", {
   id: uuid("id").primaryKey().defaultRandom(),
   discountCodeId: uuid("discount_code_id").notNull().references(() => discountCodes.id, { onDelete: "cascade" }),
   accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   subscriptionId: uuid("subscription_id").references(() => accountSubscriptions.id, { onDelete: "set null" }),
+  fiscalYear: varchar("fiscal_year", { length: 20 }),
   paymentIntentId: varchar("payment_intent_id", { length: 255 }),
   amountDiscounted: integer("amount_discounted").notNull().default(0),
   redeemedAt: timestamp("redeemed_at").defaultNow().notNull(),
 }, (table) => ({
   codeAccountIdx: index("discount_redemption_idx").on(table.discountCodeId, table.accountId),
+  fiscalYearIdx: index("discount_redemption_fiscal_year_idx").on(table.fiscalYear),
 }));
 
 export const paymentLedger = pgTable("payment_ledger", {

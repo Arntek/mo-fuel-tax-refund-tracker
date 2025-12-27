@@ -265,14 +265,18 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         if (discountCodeId && userId) {
           try {
             const amountDiscounted = session.total_details?.amount_discount || 0;
+            const paymentIntentIdForRedemption = session.payment_intent 
+              ? (typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent.id)
+              : undefined;
             await storage.recordDiscountCodeRedemption({
               discountCodeId,
               accountId,
               userId,
               fiscalYear,
               amountDiscounted,
+              paymentIntentId: paymentIntentIdForRedemption,
             });
-            console.log(`[Stripe Webhook] Recorded discount code redemption: ${discountCodeId}`);
+            console.log(`[Stripe Webhook] Recorded discount code redemption: ${discountCodeId} with paymentIntent: ${paymentIntentIdForRedemption}`);
           } catch (err) {
             console.error(`[Stripe Webhook] Failed to record discount code redemption:`, err);
           }

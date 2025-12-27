@@ -888,6 +888,26 @@ export class DbStorage implements IStorage {
     return redemptions.map(r => ({ ...r.redemption, discountCode: r.discountCode }));
   }
 
+  // Record a discount code redemption from webhook (creates redemption + increments count)
+  async recordDiscountCodeRedemption(data: {
+    discountCodeId: string;
+    accountId: string;
+    userId: string;
+    fiscalYear: string;
+    amountDiscounted: number;
+    paymentIntentId?: string;
+  }): Promise<void> {
+    await db.insert(schema.discountCodeRedemptions).values({
+      discountCodeId: data.discountCodeId,
+      accountId: data.accountId,
+      userId: data.userId,
+      fiscalYear: data.fiscalYear,
+      amountDiscounted: data.amountDiscounted,
+      paymentIntentId: data.paymentIntentId || null,
+    });
+    await this.incrementDiscountCodeRedemptions(data.discountCodeId);
+  }
+
   // Hierarchical queries for admin dashboard
   async getUsersWithAccountsAndPayments(): Promise<(User & { 
     accounts: (Account & { 
