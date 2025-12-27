@@ -1,6 +1,6 @@
 import Stripe from "stripe";
-import { db } from "./storage";
-import { users, fiscalYearPlans, accountSubscriptions, accounts } from "@shared/schema";
+import { db, storage } from "./storage";
+import { users, fiscalYearPlans, accountSubscriptions, accounts, paymentLedger } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 function getStripeInstance(): Stripe | null {
@@ -182,7 +182,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const { accountId, fiscalYear } = session.metadata || {};
+      const { accountId, fiscalYear, userId } = session.metadata || {};
       
       console.log(`[Stripe Webhook] checkout.session.completed - accountId: ${accountId}, fiscalYear: ${fiscalYear}`);
 
@@ -220,10 +220,101 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             ...subscriptionData,
           });
         }
+
+        // Create payment ledger entry
+        if (session.payment_intent) {
+          const paymentIntentId = typeof session.payment_intent === 'string' 
+            ? session.payment_intent 
+            : session.payment_intent.id;
+          
+          const amountTotal = session.amount_total || 0;
+          await storage.upsertPaymentLedgerEntry({
+            paymentIntentId,
+            accountId,
+            userId: userId || null,
+            fiscalYear,
+            amountCaptured: amountTotal,
+            amountRefunded: 0,
+            netAmount: amountTotal,
+            currency: session.currency || "usd",
+            status: "succeeded",
+            stripeCustomerId: session.customer as string,
+            description: `Missouri Form 4923-H Tax Refund - Fiscal Year ${fiscalYear}`,
+          });
+          console.log(`[Stripe Webhook] Created payment ledger entry for ${paymentIntentId}`);
+        }
+        
         console.log(`[Stripe Webhook] Subscription activated for account ${accountId}, fiscal year ${fiscalYear}`);
       } else {
         console.warn(`[Stripe Webhook] Missing metadata - accountId: ${accountId}, fiscalYear: ${fiscalYear}`);
       }
+      break;
+    }
+
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      const paymentIntentId = typeof charge.payment_intent === 'string' 
+        ? charge.payment_intent 
+        : charge.payment_intent?.id;
+      
+      if (paymentIntentId) {
+        const existingEntry = await storage.getPaymentLedgerEntry(paymentIntentId);
+        const amountRefunded = charge.amount_refunded || 0;
+        const amountCaptured = charge.amount || 0;
+        const netAmount = amountCaptured - amountRefunded;
+        
+        if (existingEntry) {
+          // Update existing ledger entry with refund info
+          await storage.upsertPaymentLedgerEntry({
+            ...existingEntry,
+            amountRefunded,
+            netAmount,
+            status: amountRefunded >= amountCaptured ? "refunded" : "partially_refunded",
+          });
+          console.log(`[Stripe Webhook] Updated ledger entry for refund: ${paymentIntentId}`);
+        } else {
+          // Create new ledger entry from charge (for historical payments)
+          const metadata = charge.metadata || {};
+          await storage.upsertPaymentLedgerEntry({
+            paymentIntentId,
+            accountId: metadata.accountId || null,
+            userId: metadata.userId || null,
+            fiscalYear: metadata.fiscalYear || null,
+            amountCaptured,
+            amountRefunded,
+            netAmount,
+            currency: charge.currency || "usd",
+            status: amountRefunded >= amountCaptured ? "refunded" : "partially_refunded",
+            stripeCustomerId: typeof charge.customer === 'string' ? charge.customer : charge.customer?.id || null,
+            description: charge.description || null,
+            receiptUrl: charge.receipt_url || null,
+          });
+          console.log(`[Stripe Webhook] Created ledger entry for historical refund: ${paymentIntentId}`);
+        }
+      }
+      break;
+    }
+
+    case "payment_intent.succeeded": {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const metadata = paymentIntent.metadata || {};
+      const latestCharge = (paymentIntent as any).latest_charge as Stripe.Charge | null;
+      
+      await storage.upsertPaymentLedgerEntry({
+        paymentIntentId: paymentIntent.id,
+        accountId: metadata.accountId || null,
+        userId: metadata.userId || null,
+        fiscalYear: metadata.fiscalYear || null,
+        amountCaptured: paymentIntent.amount,
+        amountRefunded: 0,
+        netAmount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: "succeeded",
+        stripeCustomerId: typeof paymentIntent.customer === 'string' ? paymentIntent.customer : paymentIntent.customer?.id || null,
+        description: paymentIntent.description || null,
+        receiptUrl: latestCharge?.receipt_url || null,
+      });
+      console.log(`[Stripe Webhook] Created/updated ledger entry for payment: ${paymentIntent.id}`);
       break;
     }
 
@@ -283,7 +374,83 @@ export async function refundPayment(paymentIntentId: string, reason?: string): P
       refundReason: reason || "Admin initiated refund",
     },
   });
+  
+  // Update payment ledger immediately after refund
+  const pi = await requireStripe().paymentIntents.retrieve(paymentIntentId, {
+    expand: ["latest_charge"],
+  });
+  const latestCharge = pi.latest_charge as Stripe.Charge | null;
+  const amountRefunded = latestCharge?.amount_refunded || refund.amount;
+  const amountCaptured = pi.amount;
+  const netAmount = amountCaptured - amountRefunded;
+  
+  await storage.upsertPaymentLedgerEntry({
+    paymentIntentId,
+    accountId: pi.metadata?.accountId || null,
+    userId: pi.metadata?.userId || null,
+    fiscalYear: pi.metadata?.fiscalYear || null,
+    amountCaptured,
+    amountRefunded,
+    netAmount,
+    currency: pi.currency,
+    status: amountRefunded >= amountCaptured ? "refunded" : "partially_refunded",
+    stripeCustomerId: typeof pi.customer === 'string' ? pi.customer : pi.customer?.id || null,
+    description: pi.description || null,
+    receiptUrl: latestCharge?.receipt_url || null,
+  });
+  console.log(`[Stripe] Updated ledger entry after refund: ${paymentIntentId}`);
+  
   return refund;
+}
+
+export async function syncPaymentsToLedger(): Promise<{ synced: number; errors: number }> {
+  let synced = 0;
+  let errors = 0;
+  
+  try {
+    const payments = await getAllPayments(100);
+    
+    for (const pi of payments) {
+      try {
+        if (pi.status !== "succeeded") continue;
+        
+        const latestCharge = (pi as any).latest_charge as Stripe.Charge | null;
+        const amountRefunded = latestCharge?.amount_refunded || 0;
+        const amountCaptured = pi.amount;
+        const netAmount = amountCaptured - amountRefunded;
+        
+        let status = "succeeded";
+        if (amountRefunded >= amountCaptured) {
+          status = "refunded";
+        } else if (amountRefunded > 0) {
+          status = "partially_refunded";
+        }
+        
+        await storage.upsertPaymentLedgerEntry({
+          paymentIntentId: pi.id,
+          accountId: pi.metadata?.accountId || null,
+          userId: pi.metadata?.userId || null,
+          fiscalYear: pi.metadata?.fiscalYear || null,
+          amountCaptured,
+          amountRefunded,
+          netAmount,
+          currency: pi.currency,
+          status,
+          stripeCustomerId: typeof pi.customer === 'string' ? pi.customer : null,
+          description: pi.description || null,
+          receiptUrl: latestCharge?.receipt_url || null,
+        });
+        synced++;
+      } catch (err) {
+        console.error(`[Stripe Sync] Error syncing payment ${pi.id}:`, err);
+        errors++;
+      }
+    }
+  } catch (err) {
+    console.error("[Stripe Sync] Error fetching payments:", err);
+  }
+  
+  return { synced, errors };
 }
 
 export async function getPaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
