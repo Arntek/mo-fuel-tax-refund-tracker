@@ -8,7 +8,37 @@ This is a multi-tenant web application for managing gas station receipts for Mis
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (December 26, 2025)
+## Recent Changes (December 27, 2025)
+
+### Discount Code System
+- **Discount Code Management**: Admin can create, list, and deactivate discount codes
+- **Stripe Integration**: Discount codes sync with Stripe coupons and promotion codes
+- **Types**: Support both percentage (e.g., 20% off) and fixed-amount (e.g., $5 off) discounts
+- **Fiscal Year Specific**: Codes can be restricted to specific fiscal years or apply to all
+- **Usage Tracking**: Track redemption count vs max redemptions
+- **Checkout Integration**: Users can apply discount codes during checkout
+
+### Payment Ledger System
+- **Accurate Revenue Tracking**: Payment ledger is the source of truth for revenue calculations
+- **Webhook Integration**: Stripe webhooks populate ledger entries on successful payments
+- **Refund Tracking**: Ledger entries updated when refunds occur via webhook or admin action
+- **Net Revenue Calculation**: Admin stats show net revenue (captured - refunded)
+
+### Admin Dashboard Enhancements
+- **5-Tab Navigation**: Overview, Payments, Discounts, Plans, Users
+- **Revenue Cards**: Net Revenue (green), Total Captured, Total Refunded (red), Total Discounted (orange)
+- **Account Statistics**: Paid Accounts, Trial Accounts, Total Accounts
+- **Discount Codes Tab**: Create new codes, view usage stats, deactivate codes
+- **Fiscal Year Filtering**: Filter stats by fiscal year
+
+### Database Schema Additions
+- **discountCodes**: Code, type, value, max redemptions, Stripe coupon/promotion IDs
+- **discountCodeRedemptions**: Tracks each redemption with userId, fiscalYear, amountDiscounted, paymentIntentId
+- **paymentLedger**: Payment tracking with captured/refunded amounts, net amount, status
+
+---
+
+## Previous Changes (December 26, 2025)
 
 ### Security Enhancements
 - **Receipt Image Access Control**: `/objects` endpoint now requires authentication and enforces role-based access - members can only download images for receipts they uploaded or for assigned vehicles
