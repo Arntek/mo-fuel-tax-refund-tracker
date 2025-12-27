@@ -3,7 +3,6 @@ import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import { ReceiptTable } from "@/components/receipt-table";
 import { DashboardSummary } from "@/components/dashboard-summary";
-import { ExportSection } from "@/components/export-section";
 import { DeadlineBanner } from "@/components/deadline-banner";
 import { AccountLayout } from "@/components/account-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -235,8 +234,6 @@ export default function Receipts() {
           </div>
         )}
 
-        {/* Export Section */}
-        <ExportSection receipts={receipts} />
       </main>
     </AccountLayout>
   );

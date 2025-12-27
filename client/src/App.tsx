@@ -14,6 +14,7 @@ import VehicleEdit from "@/pages/vehicle-edit";
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
 import Billing from "@/pages/billing";
+import Export from "@/pages/export";
 import Privacy from "@/pages/privacy";
 import Security from "@/pages/security";
 import Cookies from "@/pages/cookies";
@@ -87,6 +88,11 @@ function Router() {
       <Route path="/billing/:accountId">
         <AuthCheck>
           <Billing />
+        </AuthCheck>
+      </Route>
+      <Route path="/export/:accountId">
+        <AuthCheck>
+          <Export />
         </AuthCheck>
       </Route>
       <Route path="/privacy" component={Privacy} />

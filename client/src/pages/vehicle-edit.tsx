@@ -155,9 +155,9 @@ export default function VehicleEdit() {
 
   return (
     <AccountLayout accountId={accountId}>
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full space-y-6">
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">Edit Vehicle</h1>
+          <h1 className="text-2xl font-semibold">Edit Vehicle</h1>
         </div>
 
         <Card>

@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Upload, Settings, LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, LayoutDashboard } from "lucide-react";
+import { LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, LayoutDashboard, FileDown, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
@@ -37,6 +37,11 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   const { data: account, isLoading } = useQuery<Account>({
     queryKey: ["/api/accounts", accountId],
@@ -117,6 +122,12 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
         icon: CreditCard,
         testId: "button-billing",
       },
+      {
+        title: "Export Data",
+        url: accountId ? `/export/${accountId}` : "#",
+        icon: FileDown,
+        testId: "button-export",
+      },
     ] : []),
   ];
 
@@ -172,6 +183,12 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
           <SidebarFooter className="p-4 border-t">
             <SidebarMenu>
               <SidebarMenuItem>
+                <SidebarMenuButton onClick={toggleTheme} tooltip={theme === "dark" ? "Light Mode" : "Dark Mode"}>
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleSwitchAccount} tooltip="Switch Account">
                   <ChevronDown className="h-4 w-4 rotate-90" />
                   <span>Switch Account</span>
@@ -189,68 +206,68 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <header className="flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 sticky top-0 z-40">
-            {/* Mobile Nav Toggle */}
-            <div className="flex sm:hidden items-center gap-2">
-              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-64 p-0">
-                  <div className="flex flex-col h-full">
-                    <div className="p-6 border-b">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Receipt className="h-6 w-6 text-primary" />
-                        <span className="font-bold text-lg">Arntek</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{account?.name}</p>
+          {/* Mobile Header - only visible on small screens */}
+          <header className="flex sm:hidden h-14 items-center gap-4 border-b bg-background px-4 sticky top-0 z-40">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0">
+                <div className="flex flex-col h-full">
+                  <div className="p-6 border-b">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Receipt className="h-6 w-6 text-primary" />
+                      <span className="font-bold text-lg">Arntek</span>
                     </div>
-                    <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-                      {menuItems.map((item) => (
-                        <Link key={item.title} href={item.url}>
-                          <Button 
-                            variant={location === item.url ? "secondary" : "ghost"}
-                            className="w-full justify-start gap-3 px-3 h-11"
-                            onClick={() => setMobileMenuOpen(false)}
-                            data-testid={`mobile-${item.testId}`}
-                          >
-                            <item.icon className="h-5 w-5" />
-                            {item.title}
-                          </Button>
-                        </Link>
-                      ))}
-                    </nav>
-                    <div className="p-4 border-t space-y-2">
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start gap-3 h-11"
-                        onClick={handleSwitchAccount}
-                      >
-                        <ChevronDown className="h-5 w-5 rotate-90" />
-                        Switch Account
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start gap-3 h-11 text-destructive hover:text-destructive"
-                        onClick={handleLogout}
-                      >
-                        <LogOut className="h-5 w-5" />
-                        Logout
-                      </Button>
-                    </div>
+                    <p className="text-sm text-muted-foreground">{account?.name}</p>
                   </div>
-                </SheetContent>
-              </Sheet>
-              <div className="font-semibold truncate max-w-[150px]">{account?.name}</div>
-            </div>
-
-            <div className="flex-1 group-data-[collapsible=icon]:sm:ml-0" />
-            
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-            </div>
+                  <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+                    {menuItems.map((item) => (
+                      <Link key={item.title} href={item.url}>
+                        <Button 
+                          variant={location === item.url ? "secondary" : "ghost"}
+                          className="w-full justify-start gap-3 px-3 h-11"
+                          onClick={() => setMobileMenuOpen(false)}
+                          data-testid={`mobile-${item.testId}`}
+                        >
+                          <item.icon className="h-5 w-5" />
+                          {item.title}
+                        </Button>
+                      </Link>
+                    ))}
+                  </nav>
+                  <div className="p-4 border-t space-y-2">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-3 h-11"
+                      onClick={toggleTheme}
+                    >
+                      {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                      {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-3 h-11"
+                      onClick={handleSwitchAccount}
+                    >
+                      <ChevronDown className="h-5 w-5 rotate-90" />
+                      Switch Account
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start gap-3 h-11 text-destructive hover:text-destructive"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-5 w-5" />
+                      Logout
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+            <div className="font-semibold truncate flex-1">{account?.name}</div>
           </header>
 
           <main className="flex-1 overflow-y-auto">

@@ -184,7 +184,7 @@ export default function Settings() {
 
   return (
     <AccountLayout accountId={accountId}>
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full">
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
 
         <div className="space-y-6">
           <div>

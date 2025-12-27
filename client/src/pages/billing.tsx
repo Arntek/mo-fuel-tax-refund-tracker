@@ -139,11 +139,8 @@ export default function Billing() {
 
   return (
     <AccountLayout accountId={accountId}>
-      <main className="container max-w-4xl mx-auto py-8 px-4 space-y-6">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-semibold">Billing & Subscription</h1>
-        </div>
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
+        <h2 className="text-2xl font-semibold">Billing & Subscription</h2>
         {account && (
           <div className="mb-4">
             <p className="text-sm text-muted-foreground">
