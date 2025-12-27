@@ -1,0 +1,111 @@
+## User ↔ Account Membership & Invitation Flow (Receipt Collection System)
+
+### Current State
+- Users and Accounts are independent entities.
+- Accounts own all business data, including receipts.
+- Users interact with data through account membership, not personal ownership.
+- An Account can have multiple Users with roles:
+  - owner
+  - admin
+  - member
+- A User may belong to multiple Accounts.
+
+---
+
+### Data Ownership Rule (Critical)
+- All receipts belong to the Account, not the User.
+- A user leaving or being removed from an account does NOT:
+  - delete receipts they uploaded
+  - transfer receipt ownership
+  - modify receipt data
+- Receipts should retain:
+  - uploaded_by_user_id (for audit/history)
+  - account_id (for ownership)
+
+---
+
+### Goal
+Allow account owners to invite users by email address, independent of whether the user already exists, while preserving account-level ownership of all receipts.
+
+---
+
+### Core Concepts
+
+#### 1. Invitations
+- Invitations are created by email, not by user ID.
+- Invitation fields:
+  - account_id
+  - email
+  - role
+  - status (pending, accepted, rejected, revoked)
+  - created_at
+  - expires_at (optional)
+- Invitations may exist without a corresponding user record.
+
+---
+
+#### 2. Inviting a User
+When an account owner invites a user:
+
+1. Owner enters an email address and selects a role.
+2. System creates an Invitation tied to the account.
+3. System sends an email invitation.
+4. Owner does not need to know whether the email already belongs to a registered user.
+
+---
+
+#### 3. User Login & Invitation Matching
+- Email address is the sole matching key.
+- On login or signup:
+  - System finds all pending invitations where invitation.email === user.email.
+  - Matching invitations are displayed in the user’s UI.
+
+---
+
+#### 4. Accepting / Rejecting an Invitation
+From the user’s perspective:
+
+- Accept
+  - Create an AccountMembership record.
+  - Assign role from the invitation.
+  - Mark invitation as accepted.
+
+- Reject
+  - Mark invitation as rejected.
+  - No membership is created.
+
+---
+
+#### 5. Users Without Existing Accounts
+- If the invited email does not yet belong to a user:
+  - Invite email links to sign-up.
+  - After account creation, invitations are automatically matched by email and displayed.
+
+---
+
+#### 6. Leaving or Being Removed from an Account (Receipt-Safe Behavior)
+- A user who accepted an invitation may later:
+  - leave the account voluntarily, or
+  - be removed by an owner or admin (subject to permissions).
+- Leaving or removal:
+  - removes or deactivates the AccountMembership
+  - does NOT delete or modify any receipts
+  - does NOT reassign receipt ownership
+- Receipts uploaded by the user remain:
+  - owned by the account
+  - visible to remaining account members
+  - historically attributed to the original uploader
+
+---
+
+### Key Rules & Constraints
+- Email matching is case-insensitive and normalized.
+- Only one active pending invitation per (account_id, email).
+- Account membership controls access, not data ownership.
+- Removing a user must never cascade-delete receipts.
+- Audit/history must remain intact after membership removal.
+
+---
+
+### One-Line Summary
+Accounts own receipts; users only have access via membership. Invitations are email-based, matched on login, and leaving or removing a user removes access without removing or altering any receipts they uploaded.
