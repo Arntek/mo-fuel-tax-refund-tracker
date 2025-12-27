@@ -10,7 +10,7 @@ function getStripeInstance(): Stripe | null {
     return null;
   }
   return new Stripe(apiKey, {
-    apiVersion: "2025-05-28.basil",
+    apiVersion: "2025-12-15.clover",
   });
 }
 
@@ -251,6 +251,7 @@ export async function getCustomerPayments(customerId: string): Promise<Stripe.Pa
   const payments = await requireStripe().paymentIntents.list({
     customer: customerId,
     limit: 100,
+    expand: ["data.latest_charge"],
   });
 
   return payments.data;
@@ -268,7 +269,7 @@ export async function getCustomerInvoices(customerId: string): Promise<Stripe.In
 export async function getAllPayments(limit: number = 100): Promise<Stripe.PaymentIntent[]> {
   const payments = await requireStripe().paymentIntents.list({
     limit,
-    expand: ["data.charges.data.refunds"],
+    expand: ["data.latest_charge"],
   });
   return payments.data;
 }

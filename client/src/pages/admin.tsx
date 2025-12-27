@@ -84,6 +84,7 @@ export default function Admin() {
   });
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [refundingPaymentId, setRefundingPaymentId] = useState<string | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -179,18 +180,21 @@ export default function Admin() {
 
   const refundMutation = useMutation({
     mutationFn: async (paymentIntentId: string) => {
+      setRefundingPaymentId(paymentIntentId);
       return apiRequest(`/api/admin/payments/${paymentIntentId}/refund`, {
         method: "POST",
         body: JSON.stringify({ reason: "Admin initiated refund" }),
       });
     },
     onSuccess: () => {
+      setRefundingPaymentId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       toast({ title: "Refunded", description: "Payment has been refunded" });
     },
     onError: (error: any) => {
+      setRefundingPaymentId(null);
       toast({ title: "Error", description: error.message || "Failed to process refund", variant: "destructive" });
     },
   });
@@ -465,10 +469,10 @@ export default function Admin() {
                                 size="sm"
                                 className="gap-1"
                                 onClick={() => handleRefund(payment.id, payment.accountName || payment.userEmail || "this payment")}
-                                disabled={refundMutation.isPending}
+                                disabled={refundingPaymentId !== null}
                                 data-testid={`button-refund-${payment.id}`}
                               >
-                                {refundMutation.isPending ? (
+                                {refundingPaymentId === payment.id ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />
                                 ) : (
                                   <RotateCcw className="w-3 h-3" />

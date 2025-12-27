@@ -1127,9 +1127,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
 
-            // Check for refunds
-            const charges = (pi as any).charges?.data || [];
-            const refunded = charges.some((c: any) => c.refunded || (c.refunds?.data?.length > 0));
+            // Check for refunds via latest_charge
+            const latestCharge = (pi as any).latest_charge;
+            const refunded = latestCharge?.refunded === true || 
+              (latestCharge?.amount_refunded && latestCharge.amount_refunded > 0);
 
             // Apply search filter
             if (search) {
@@ -1312,7 +1313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currency: pi.currency,
           created: pi.created,
           description: pi.description,
-          receiptUrl: pi.charges?.data?.[0]?.receipt_url || null,
+          receiptUrl: (pi as any).latest_charge?.receipt_url || null,
           metadata: pi.metadata,
         }));
 
