@@ -28,7 +28,11 @@ import {
   RotateCcw,
   CheckCircle,
   Clock,
-  Building2
+  Building2,
+  Tag,
+  Percent,
+  Ban,
+  AlertTriangle
 } from "lucide-react";
 import type { User, FiscalYearPlan } from "@shared/schema";
 import { format } from "date-fns";
@@ -41,9 +45,27 @@ type UserWithStats = User & {
 
 type AdminStats = {
   totalRevenue: number;
+  netRevenue: number;
+  totalRefunded: number;
   paidAccounts: number;
   trialAccounts: number;
   totalAccounts: number;
+  discountCodesUsed: number;
+  totalDiscounted: number;
+};
+
+type DiscountCode = {
+  id: string;
+  code: string;
+  description: string | null;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  fiscalYear: string | null;
+  active: boolean;
+  expiresAt: string | null;
+  createdAt: string;
 };
 
 type AdminAccount = {
@@ -85,6 +107,14 @@ export default function Admin() {
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [refundingPaymentId, setRefundingPaymentId] = useState<string | null>(null);
+  const [newDiscountCode, setNewDiscountCode] = useState({
+    code: "",
+    description: "",
+    discountType: "percentage" as "percentage" | "fixed",
+    discountValue: 100,
+    maxRedemptions: "",
+    fiscalYear: "",
+  });
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -145,6 +175,10 @@ export default function Admin() {
   
   const payments = paymentsData?.payments || [];
 
+  const { data: discountCodesData, isLoading: discountCodesLoading } = useQuery<{ codes: DiscountCode[] }>({
+    queryKey: ["/api/admin/discount-codes"],
+  });
+
   const createPlanMutation = useMutation({
     mutationFn: async (data: typeof newPlan) => {
       return apiRequest("/api/admin/plans", {
@@ -199,6 +233,52 @@ export default function Admin() {
     },
   });
 
+  const createDiscountCodeMutation = useMutation({
+    mutationFn: async (data: typeof newDiscountCode) => {
+      return apiRequest("/api/admin/discount-codes", {
+        method: "POST",
+        body: JSON.stringify({
+          code: data.code.toUpperCase(),
+          description: data.description || null,
+          discountType: data.discountType,
+          discountValue: data.discountType === "percentage" ? data.discountValue : data.discountValue,
+          maxRedemptions: data.maxRedemptions ? parseInt(data.maxRedemptions) : null,
+          fiscalYear: data.fiscalYear || null,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      toast({ title: "Created", description: "Discount code created successfully" });
+      setNewDiscountCode({
+        code: "",
+        description: "",
+        discountType: "percentage",
+        discountValue: 100,
+        maxRedemptions: "",
+        fiscalYear: "",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create discount code", variant: "destructive" });
+    },
+  });
+
+  const deactivateDiscountCodeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/discount-codes/${id}/deactivate`, {
+        method: "PUT",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      toast({ title: "Deactivated", description: "Discount code has been deactivated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to deactivate discount code", variant: "destructive" });
+    },
+  });
+
   const handleCreatePlan = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlan.fiscalYear || !newPlan.name) {
@@ -213,6 +293,23 @@ export default function Admin() {
       refundMutation.mutate(paymentIntentId);
     }
   };
+
+  const handleCreateDiscountCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDiscountCode.code) {
+      toast({ title: "Error", description: "Code is required", variant: "destructive" });
+      return;
+    }
+    createDiscountCodeMutation.mutate(newDiscountCode);
+  };
+
+  const handleDeactivateDiscountCode = (id: string, code: string) => {
+    if (confirm(`Are you sure you want to deactivate the discount code "${code}"?`)) {
+      deactivateDiscountCodeMutation.mutate(id);
+    }
+  };
+
+  const discountCodes = discountCodesData?.codes || [];
 
   if (!user?.isAdmin) {
     return (
@@ -256,7 +353,7 @@ export default function Admin() {
 
       <main className="container max-w-6xl mx-auto py-8 px-4">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-4">
+          <TabsList className="grid w-full max-w-2xl grid-cols-5">
             <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
               <TrendingUp className="w-4 h-4" />
               Overview
@@ -264,6 +361,10 @@ export default function Admin() {
             <TabsTrigger value="payments" className="gap-2" data-testid="tab-payments">
               <CreditCard className="w-4 h-4" />
               Payments
+            </TabsTrigger>
+            <TabsTrigger value="discounts" className="gap-2" data-testid="tab-discounts">
+              <Tag className="w-4 h-4" />
+              Discounts
             </TabsTrigger>
             <TabsTrigger value="plans" className="gap-2" data-testid="tab-plans">
               <Calendar className="w-4 h-4" />
@@ -296,8 +397,27 @@ export default function Admin() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                  <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-net-revenue">
+                      ${((stats?.netRevenue || 0) / 100).toFixed(2)}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    After refunds
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Captured</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   {statsLoading ? (
@@ -308,11 +428,51 @@ export default function Admin() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    From paid subscriptions
+                    Gross revenue
                   </p>
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Refunded</CardTitle>
+                  <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-total-refunded">
+                      ${((stats?.totalRefunded || 0) / 100).toFixed(2)}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Money returned
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Discounted</CardTitle>
+                  <Tag className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-total-discounted">
+                      ${((stats?.totalDiscounted || 0) / 100).toFixed(2)}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {stats?.discountCodesUsed || 0} codes used
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Paid Accounts</CardTitle>
@@ -478,6 +638,177 @@ export default function Admin() {
                                   <RotateCcw className="w-3 h-3" />
                                 )}
                                 Refund
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Discount Codes Tab */}
+          <TabsContent value="discounts" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Create Discount Code
+                </CardTitle>
+                <CardDescription>
+                  Create a new discount code. This will also create a coupon in Stripe.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleCreateDiscountCode} className="grid gap-4 md:grid-cols-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="discountCode">Code</Label>
+                    <Input
+                      id="discountCode"
+                      placeholder="SAVE20"
+                      value={newDiscountCode.code}
+                      onChange={(e) => setNewDiscountCode({ ...newDiscountCode, code: e.target.value.toUpperCase() })}
+                      data-testid="input-discount-code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discountDesc">Description</Label>
+                    <Input
+                      id="discountDesc"
+                      placeholder="20% off"
+                      value={newDiscountCode.description}
+                      onChange={(e) => setNewDiscountCode({ ...newDiscountCode, description: e.target.value })}
+                      data-testid="input-discount-desc"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discountType">Type</Label>
+                    <Select value={newDiscountCode.discountType} onValueChange={(v: "percentage" | "fixed") => setNewDiscountCode({ ...newDiscountCode, discountType: v })}>
+                      <SelectTrigger data-testid="select-discount-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percentage">Percentage</SelectItem>
+                        <SelectItem value="fixed">Fixed Amount</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discountValue">
+                      {newDiscountCode.discountType === "percentage" ? "Percent Off" : "Amount (cents)"}
+                    </Label>
+                    <Input
+                      id="discountValue"
+                      type="number"
+                      value={newDiscountCode.discountValue}
+                      onChange={(e) => setNewDiscountCode({ ...newDiscountCode, discountValue: parseInt(e.target.value) || 0 })}
+                      data-testid="input-discount-value"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxRedemptions">Max Uses</Label>
+                    <Input
+                      id="maxRedemptions"
+                      type="number"
+                      placeholder="Unlimited"
+                      value={newDiscountCode.maxRedemptions}
+                      onChange={(e) => setNewDiscountCode({ ...newDiscountCode, maxRedemptions: e.target.value })}
+                      data-testid="input-max-redemptions"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="submit"
+                      disabled={createDiscountCodeMutation.isPending}
+                      className="w-full"
+                      data-testid="button-create-discount"
+                    >
+                      {createDiscountCodeMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        "Create"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Discount Codes</CardTitle>
+                <CardDescription>
+                  Manage discount codes and view usage statistics.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {discountCodesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : discountCodes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No discount codes created yet.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Discount</TableHead>
+                        <TableHead className="text-center">Uses</TableHead>
+                        <TableHead>Fiscal Year</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {discountCodes.map((code) => (
+                        <TableRow key={code.id} data-testid={`row-discount-${code.id}`}>
+                          <TableCell className="font-mono font-medium">
+                            {code.code}
+                          </TableCell>
+                          <TableCell>
+                            {code.description || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {code.discountType === "percentage" ? (
+                              <span className="flex items-center gap-1">
+                                <Percent className="w-3 h-3" />
+                                {code.discountValue}%
+                              </span>
+                            ) : (
+                              <span>${(code.discountValue / 100).toFixed(2)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {code.redemptionCount}
+                            {code.maxRedemptions && ` / ${code.maxRedemptions}`}
+                          </TableCell>
+                          <TableCell>
+                            {code.fiscalYear || "All"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={code.active ? "default" : "secondary"}>
+                              {code.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {code.active && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleDeactivateDiscountCode(code.id, code.code)}
+                                disabled={deactivateDiscountCodeMutation.isPending}
+                                data-testid={`button-deactivate-${code.id}`}
+                              >
+                                <Ban className="w-3 h-3" />
+                                Deactivate
                               </Button>
                             )}
                           </TableCell>
