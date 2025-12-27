@@ -231,6 +231,77 @@ export const insertAccountSubscriptionSchema = createInsertSchema(accountSubscri
   createdAt: true,
 });
 
+export const discountCodes = pgTable("discount_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  description: text("description"),
+  discountType: varchar("discount_type", { length: 20 }).notNull().default("percentage"),
+  discountValue: integer("discount_value").notNull(),
+  maxRedemptions: integer("max_redemptions"),
+  redemptionCount: integer("redemption_count").notNull().default(0),
+  fiscalYear: text("fiscal_year"),
+  stripeCouponId: varchar("stripe_coupon_id", { length: 255 }),
+  stripePromotionCodeId: varchar("stripe_promotion_code_id", { length: 255 }),
+  active: boolean("active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: index("discount_code_idx").on(table.code),
+}));
+
+export const discountCodeRedemptions = pgTable("discount_code_redemptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  discountCodeId: uuid("discount_code_id").notNull().references(() => discountCodes.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  subscriptionId: uuid("subscription_id").references(() => accountSubscriptions.id, { onDelete: "set null" }),
+  paymentIntentId: varchar("payment_intent_id", { length: 255 }),
+  amountDiscounted: integer("amount_discounted").notNull().default(0),
+  redeemedAt: timestamp("redeemed_at").defaultNow().notNull(),
+}, (table) => ({
+  codeAccountIdx: index("discount_redemption_idx").on(table.discountCodeId, table.accountId),
+}));
+
+export const paymentLedger = pgTable("payment_ledger", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  paymentIntentId: varchar("payment_intent_id", { length: 255 }).notNull().unique(),
+  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  fiscalYear: text("fiscal_year"),
+  amountCaptured: integer("amount_captured").notNull().default(0),
+  amountRefunded: integer("amount_refunded").notNull().default(0),
+  netAmount: integer("net_amount").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).notNull().default("usd"),
+  status: varchar("status", { length: 50 }).notNull().default("pending"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  description: text("description"),
+  receiptUrl: text("receipt_url"),
+  discountCodeId: uuid("discount_code_id").references(() => discountCodes.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  paymentIntentIdx: index("payment_ledger_pi_idx").on(table.paymentIntentId),
+  accountIdx: index("payment_ledger_account_idx").on(table.accountId),
+  userIdx: index("payment_ledger_user_idx").on(table.userId),
+  fiscalYearIdx: index("payment_ledger_fy_idx").on(table.fiscalYear),
+}));
+
+export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
+  id: true,
+  createdAt: true,
+  redemptionCount: true,
+});
+
+export const insertDiscountCodeRedemptionSchema = createInsertSchema(discountCodeRedemptions).omit({
+  id: true,
+  redeemedAt: true,
+});
+
+export const insertPaymentLedgerSchema = createInsertSchema(paymentLedger).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
@@ -263,6 +334,15 @@ export type InsertFiscalYearPlan = z.infer<typeof insertFiscalYearPlanSchema>;
 
 export type AccountSubscription = typeof accountSubscriptions.$inferSelect;
 export type InsertAccountSubscription = z.infer<typeof insertAccountSubscriptionSchema>;
+
+export type DiscountCode = typeof discountCodes.$inferSelect;
+export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
+
+export type DiscountCodeRedemption = typeof discountCodeRedemptions.$inferSelect;
+export type InsertDiscountCodeRedemption = z.infer<typeof insertDiscountCodeRedemptionSchema>;
+
+export type PaymentLedgerEntry = typeof paymentLedger.$inferSelect;
+export type InsertPaymentLedgerEntry = z.infer<typeof insertPaymentLedgerSchema>;
 
 export const aiTranscriptionSchema = z.object({
   date: z.string().nullable(),

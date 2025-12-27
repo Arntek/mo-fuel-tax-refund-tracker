@@ -24,6 +24,12 @@ import {
   type InsertFiscalYearPlan,
   type AccountSubscription,
   type InsertAccountSubscription,
+  type DiscountCode,
+  type InsertDiscountCode,
+  type DiscountCodeRedemption,
+  type InsertDiscountCodeRedemption,
+  type PaymentLedgerEntry,
+  type InsertPaymentLedgerEntry,
 } from "@shared/schema";
 import ws from "ws";
 
@@ -727,6 +733,261 @@ export class DbStorage implements IStorage {
     });
 
     return results;
+  }
+
+  // Payment Ledger operations
+  async upsertPaymentLedgerEntry(entry: InsertPaymentLedgerEntry): Promise<PaymentLedgerEntry> {
+    const existing = await this.getPaymentLedgerEntry(entry.paymentIntentId);
+    if (existing) {
+      const [updated] = await db
+        .update(schema.paymentLedger)
+        .set({ ...entry, updatedAt: new Date() })
+        .where(eq(schema.paymentLedger.paymentIntentId, entry.paymentIntentId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.paymentLedger).values(entry).returning();
+    return created;
+  }
+
+  async getPaymentLedgerEntry(paymentIntentId: string): Promise<PaymentLedgerEntry | undefined> {
+    const [entry] = await db
+      .select()
+      .from(schema.paymentLedger)
+      .where(eq(schema.paymentLedger.paymentIntentId, paymentIntentId))
+      .limit(1);
+    return entry;
+  }
+
+  async getAllPaymentLedgerEntries(fiscalYear?: string): Promise<PaymentLedgerEntry[]> {
+    let query = db.select().from(schema.paymentLedger);
+    if (fiscalYear) {
+      query = query.where(eq(schema.paymentLedger.fiscalYear, fiscalYear)) as any;
+    }
+    return query.orderBy(desc(schema.paymentLedger.createdAt));
+  }
+
+  async getPaymentLedgerByAccount(accountId: string): Promise<PaymentLedgerEntry[]> {
+    return db
+      .select()
+      .from(schema.paymentLedger)
+      .where(eq(schema.paymentLedger.accountId, accountId))
+      .orderBy(desc(schema.paymentLedger.createdAt));
+  }
+
+  async getPaymentLedgerByUser(userId: string): Promise<PaymentLedgerEntry[]> {
+    return db
+      .select()
+      .from(schema.paymentLedger)
+      .where(eq(schema.paymentLedger.userId, userId))
+      .orderBy(desc(schema.paymentLedger.createdAt));
+  }
+
+  async getLedgerStats(fiscalYear?: string): Promise<{
+    totalRevenue: number;
+    totalRefunded: number;
+    netRevenue: number;
+    paymentCount: number;
+    refundCount: number;
+  }> {
+    let entries = await this.getAllPaymentLedgerEntries(fiscalYear);
+    
+    const totalRevenue = entries.reduce((sum, e) => sum + e.amountCaptured, 0);
+    const totalRefunded = entries.reduce((sum, e) => sum + e.amountRefunded, 0);
+    const netRevenue = entries.reduce((sum, e) => sum + e.netAmount, 0);
+    const paymentCount = entries.filter(e => e.amountCaptured > 0).length;
+    const refundCount = entries.filter(e => e.amountRefunded > 0).length;
+
+    return { totalRevenue, totalRefunded, netRevenue, paymentCount, refundCount };
+  }
+
+  // Discount Code operations
+  async createDiscountCode(code: InsertDiscountCode): Promise<DiscountCode> {
+    const [created] = await db.insert(schema.discountCodes).values(code).returning();
+    return created;
+  }
+
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    const [discountCode] = await db
+      .select()
+      .from(schema.discountCodes)
+      .where(eq(schema.discountCodes.code, code))
+      .limit(1);
+    return discountCode;
+  }
+
+  async getDiscountCodeById(id: string): Promise<DiscountCode | undefined> {
+    const [discountCode] = await db
+      .select()
+      .from(schema.discountCodes)
+      .where(eq(schema.discountCodes.id, id))
+      .limit(1);
+    return discountCode;
+  }
+
+  async getAllDiscountCodes(): Promise<DiscountCode[]> {
+    return db.select().from(schema.discountCodes).orderBy(desc(schema.discountCodes.createdAt));
+  }
+
+  async updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined> {
+    const [updated] = await db
+      .update(schema.discountCodes)
+      .set(updates)
+      .where(eq(schema.discountCodes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deactivateDiscountCode(id: string): Promise<DiscountCode | undefined> {
+    return this.updateDiscountCode(id, { active: false });
+  }
+
+  async incrementDiscountCodeRedemptions(id: string): Promise<void> {
+    await db
+      .update(schema.discountCodes)
+      .set({ redemptionCount: sql`${schema.discountCodes.redemptionCount} + 1` })
+      .where(eq(schema.discountCodes.id, id));
+  }
+
+  // Discount Code Redemption operations
+  async createDiscountCodeRedemption(redemption: InsertDiscountCodeRedemption): Promise<DiscountCodeRedemption> {
+    const [created] = await db.insert(schema.discountCodeRedemptions).values(redemption).returning();
+    await this.incrementDiscountCodeRedemptions(redemption.discountCodeId);
+    return created;
+  }
+
+  async getDiscountCodeRedemptions(discountCodeId: string): Promise<DiscountCodeRedemption[]> {
+    return db
+      .select()
+      .from(schema.discountCodeRedemptions)
+      .where(eq(schema.discountCodeRedemptions.discountCodeId, discountCodeId))
+      .orderBy(desc(schema.discountCodeRedemptions.redeemedAt));
+  }
+
+  async getAccountDiscountRedemptions(accountId: string): Promise<(DiscountCodeRedemption & { discountCode: DiscountCode })[]> {
+    const redemptions = await db
+      .select({
+        redemption: schema.discountCodeRedemptions,
+        discountCode: schema.discountCodes,
+      })
+      .from(schema.discountCodeRedemptions)
+      .innerJoin(schema.discountCodes, eq(schema.discountCodeRedemptions.discountCodeId, schema.discountCodes.id))
+      .where(eq(schema.discountCodeRedemptions.accountId, accountId))
+      .orderBy(desc(schema.discountCodeRedemptions.redeemedAt));
+    
+    return redemptions.map(r => ({ ...r.redemption, discountCode: r.discountCode }));
+  }
+
+  // Hierarchical queries for admin dashboard
+  async getUsersWithAccountsAndPayments(): Promise<(User & { 
+    accounts: (Account & { 
+      subscriptions: AccountSubscription[];
+      payments: PaymentLedgerEntry[];
+    })[];
+  })[]> {
+    const users = await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+    const allMemberships = await db.select().from(schema.accountMembers).where(eq(schema.accountMembers.active, true));
+    const allAccounts = await db.select().from(schema.accounts);
+    const allSubscriptions = await db.select().from(schema.accountSubscriptions);
+    const allPayments = await db.select().from(schema.paymentLedger);
+    
+    const accountMap = new Map(allAccounts.map(a => [a.id, a]));
+    const subscriptionsByAccount = new Map<string, AccountSubscription[]>();
+    const paymentsByAccount = new Map<string, PaymentLedgerEntry[]>();
+    
+    for (const sub of allSubscriptions) {
+      const existing = subscriptionsByAccount.get(sub.accountId) || [];
+      existing.push(sub);
+      subscriptionsByAccount.set(sub.accountId, existing);
+    }
+    
+    for (const payment of allPayments) {
+      if (payment.accountId) {
+        const existing = paymentsByAccount.get(payment.accountId) || [];
+        existing.push(payment);
+        paymentsByAccount.set(payment.accountId, existing);
+      }
+    }
+    
+    return users.map(user => {
+      const userMemberships = allMemberships.filter(m => m.userId === user.id);
+      const accounts = userMemberships.map(m => {
+        const account = accountMap.get(m.accountId);
+        if (!account) return null;
+        return {
+          ...account,
+          subscriptions: subscriptionsByAccount.get(account.id) || [],
+          payments: paymentsByAccount.get(account.id) || [],
+        };
+      }).filter(Boolean) as (Account & { subscriptions: AccountSubscription[]; payments: PaymentLedgerEntry[] })[];
+      
+      return { ...user, accounts };
+    });
+  }
+
+  async getAllAccountsWithDetails(): Promise<(Account & {
+    owner: User;
+    memberCount: number;
+    subscriptions: AccountSubscription[];
+    payments: PaymentLedgerEntry[];
+  })[]> {
+    const accounts = await db.select().from(schema.accounts).orderBy(desc(schema.accounts.createdAt));
+    const users = await db.select().from(schema.users);
+    const memberships = await db.select().from(schema.accountMembers).where(eq(schema.accountMembers.active, true));
+    const subscriptions = await db.select().from(schema.accountSubscriptions);
+    const payments = await db.select().from(schema.paymentLedger);
+    
+    const userMap = new Map(users.map(u => [u.id, u]));
+    
+    return accounts.map(account => {
+      const owner = userMap.get(account.ownerId)!;
+      const memberCount = memberships.filter(m => m.accountId === account.id).length;
+      const accountSubs = subscriptions.filter(s => s.accountId === account.id);
+      const accountPayments = payments.filter(p => p.accountId === account.id);
+      
+      return {
+        ...account,
+        owner,
+        memberCount,
+        subscriptions: accountSubs,
+        payments: accountPayments,
+      };
+    });
+  }
+
+  async getAccountWithFullDetails(accountId: string): Promise<(Account & {
+    owner: User;
+    members: (AccountMember & { user: User })[];
+    subscriptions: AccountSubscription[];
+    payments: PaymentLedgerEntry[];
+    vehicles: Vehicle[];
+    receiptCount: number;
+  }) | undefined> {
+    const account = await this.getAccountById(accountId);
+    if (!account) return undefined;
+    
+    const owner = await this.getUserById(account.ownerId);
+    if (!owner) return undefined;
+    
+    const members = await this.getAccountMembers(accountId);
+    const subscriptions = await this.getAccountSubscriptions(accountId);
+    const payments = await this.getPaymentLedgerByAccount(accountId);
+    const vehicles = await this.getAccountVehicles(accountId);
+    
+    const [receiptResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.receipts)
+      .where(eq(schema.receipts.accountId, accountId));
+    
+    return {
+      ...account,
+      owner,
+      members,
+      subscriptions,
+      payments,
+      vehicles,
+      receiptCount: receiptResult?.count || 0,
+    };
   }
 }
 
