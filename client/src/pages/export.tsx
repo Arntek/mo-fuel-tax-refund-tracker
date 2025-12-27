@@ -7,6 +7,11 @@ import { Loader2 } from "lucide-react";
 import type { Account, Receipt } from "@shared/schema";
 import { Helmet } from "react-helmet";
 
+interface ReceiptsResponse {
+  receipts: Receipt[];
+  refundTotals: Record<string, number>;
+}
+
 export default function Export() {
   const { accountId } = useParams<{ accountId: string }>();
   const [, setLocation] = useLocation();
@@ -16,10 +21,12 @@ export default function Export() {
     enabled: !!accountId,
   });
 
-  const { data: receipts = [], isLoading: receiptsLoading } = useQuery<Receipt[]>({
+  const { data: receiptsData, isLoading: receiptsLoading } = useQuery<ReceiptsResponse>({
     queryKey: ["/api/accounts", accountId, "receipts"],
     enabled: !!accountId,
   });
+
+  const receipts = receiptsData?.receipts || [];
 
   const { data: roleData, isLoading: roleLoading } = useQuery<{ role: string }>({
     queryKey: ["/api/accounts", accountId, "my-role"],
