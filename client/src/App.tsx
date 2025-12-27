@@ -85,7 +85,42 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/security" component={Security} />
       <Route path="/cookies" component={Cookies} />
-      <Route path="/:page/:accountId/:rest*">
+      <Route path="/upload/:accountId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/receipts/:accountId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/people/:accountId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/vehicles/:accountId/edit/:vehicleId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/vehicles/:accountId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/settings/:accountId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/billing/:accountId">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
+      <Route path="/export/:accountId">
         <AuthCheck>
           <AccountRoutes />
         </AuthCheck>
