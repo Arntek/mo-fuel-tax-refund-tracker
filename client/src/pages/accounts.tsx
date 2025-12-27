@@ -141,7 +141,7 @@ export default function Accounts() {
 
   const handleSelectAccount = (accountId: number) => {
     localStorage.setItem("selectedAccountId", accountId.toString());
-    setLocation(`/dashboard/${accountId}`);
+    setLocation(`/upload/${accountId}`);
   };
 
   if (isLoading) {

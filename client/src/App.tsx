@@ -1,12 +1,13 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AccountLayout } from "@/components/account-layout";
 import Auth from "@/pages/auth";
 import Accounts from "@/pages/accounts";
-import Dashboard from "@/pages/dashboard";
+import Upload from "@/pages/upload";
 import Receipts from "@/pages/receipts";
 import People from "@/pages/people";
 import Vehicles from "@/pages/vehicles";
@@ -41,6 +42,32 @@ function AuthCheck({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AccountRoutes() {
+  const [location] = useLocation();
+  
+  const accountIdMatch = location.match(/^\/(upload|receipts|people|vehicles|settings|billing|export)\/([^/]+)/);
+  const accountId = accountIdMatch?.[2] || "";
+  
+  if (!accountId) {
+    return <Redirect to="/accounts" />;
+  }
+
+  return (
+    <AccountLayout accountId={accountId}>
+      <Switch>
+        <Route path="/upload/:accountId" component={Upload} />
+        <Route path="/receipts/:accountId" component={Receipts} />
+        <Route path="/people/:accountId" component={People} />
+        <Route path="/vehicles/:accountId/edit/:vehicleId" component={VehicleEdit} />
+        <Route path="/vehicles/:accountId" component={Vehicles} />
+        <Route path="/settings/:accountId" component={Settings} />
+        <Route path="/billing/:accountId" component={Billing} />
+        <Route path="/export/:accountId" component={Export} />
+      </Switch>
+    </AccountLayout>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -50,54 +77,19 @@ function Router() {
           <Accounts />
         </AuthCheck>
       </Route>
-      <Route path="/dashboard/:accountId">
-        <AuthCheck>
-          <Dashboard />
-        </AuthCheck>
-      </Route>
-      <Route path="/receipts/:accountId">
-        <AuthCheck>
-          <Receipts />
-        </AuthCheck>
-      </Route>
-      <Route path="/people/:accountId">
-        <AuthCheck>
-          <People />
-        </AuthCheck>
-      </Route>
-      <Route path="/vehicles/:accountId/edit/:vehicleId">
-        <AuthCheck>
-          <VehicleEdit />
-        </AuthCheck>
-      </Route>
-      <Route path="/vehicles/:accountId">
-        <AuthCheck>
-          <Vehicles />
-        </AuthCheck>
-      </Route>
-      <Route path="/settings/:accountId">
-        <AuthCheck>
-          <Settings />
-        </AuthCheck>
-      </Route>
       <Route path="/admin">
         <AuthCheck>
           <Admin />
         </AuthCheck>
       </Route>
-      <Route path="/billing/:accountId">
-        <AuthCheck>
-          <Billing />
-        </AuthCheck>
-      </Route>
-      <Route path="/export/:accountId">
-        <AuthCheck>
-          <Export />
-        </AuthCheck>
-      </Route>
       <Route path="/privacy" component={Privacy} />
       <Route path="/security" component={Security} />
       <Route path="/cookies" component={Cookies} />
+      <Route path="/:page/:accountId/:rest*">
+        <AuthCheck>
+          <AccountRoutes />
+        </AuthCheck>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

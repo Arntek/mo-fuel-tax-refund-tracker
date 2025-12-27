@@ -8,7 +8,6 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { AccountLayout } from "@/components/account-layout";
 import { CreditCard, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText, Receipt } from "lucide-react";
 import type { Account, FiscalYearPlan } from "@shared/schema";
 
@@ -48,7 +47,7 @@ export default function Billing() {
 
   useEffect(() => {
     if (!roleLoading && roleData && !isAdminOrOwner) {
-      setLocation(`/dashboard/${accountId}`);
+      setLocation(`/upload/${accountId}`);
     }
   }, [roleLoading, roleData, isAdminOrOwner, accountId, setLocation]);
 
@@ -138,8 +137,7 @@ export default function Billing() {
   const trialProgress = subscriptionStatus ? Math.min(100, (subscriptionStatus.receiptCount / 8) * 100) : 0;
 
   return (
-    <AccountLayout accountId={accountId}>
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
+    <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         <h2 className="text-2xl font-semibold">Billing & Subscription</h2>
         {account && (
           <div className="mb-4">
@@ -382,8 +380,7 @@ export default function Billing() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </AccountLayout>
+    </main>
   );
 }
 

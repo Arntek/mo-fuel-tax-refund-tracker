@@ -2,14 +2,14 @@ import { Receipt } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Fuel, DollarSign, FileText, Calendar } from "lucide-react";
 
-interface DashboardSummaryProps {
+interface FiscalYearSummaryProps {
   receipts: Receipt[];
   fiscalYear: string;
 }
 
-export function DashboardSummary({ receipts, fiscalYear }: DashboardSummaryProps) {
-  const totalGallons = receipts.reduce((sum, r) => sum + parseFloat(r.gallons), 0);
-  const totalAmount = receipts.reduce((sum, r) => sum + parseFloat(r.totalAmount), 0);
+export function FiscalYearSummary({ receipts, fiscalYear }: FiscalYearSummaryProps) {
+  const totalGallons = receipts.reduce((sum, r) => sum + parseFloat(r.gallons || "0"), 0);
+  const totalAmount = receipts.reduce((sum, r) => sum + parseFloat(r.totalAmount || "0"), 0);
   const receiptCount = receipts.length;
 
   const daysUntilDeadline = getDaysUntilDeadline();

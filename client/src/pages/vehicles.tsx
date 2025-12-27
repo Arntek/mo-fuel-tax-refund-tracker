@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AccountLayout } from "@/components/account-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,30 +162,28 @@ export default function Vehicles() {
 
   if (accountError || !account) {
     return (
-      <AccountLayout accountId={accountId}>
-        <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md w-full mx-4">
-            <CardHeader>
-              <CardTitle>Account Not Found</CardTitle>
-              <CardDescription>
-                This account could not be loaded. Please try switching to a different account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full" data-testid="button-switch-account-error">
-                <Link href="/accounts">
-                  Switch Account
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
-      </AccountLayout>
+      <main className="flex-1 flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4">
+          <CardHeader>
+            <CardTitle>Account Not Found</CardTitle>
+            <CardDescription>
+              This account could not be loaded. Please try switching to a different account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full" data-testid="button-switch-account-error">
+              <Link href="/accounts">
+                Switch Account
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   return (
-    <AccountLayout accountId={accountId}>
+    <>
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold">Vehicles</h1>
@@ -424,6 +421,6 @@ export default function Vehicles() {
           )}
         </div>
       </main>
-    </AccountLayout>
+    </>
   );
 }

@@ -2,9 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import { ReceiptTable } from "@/components/receipt-table";
-import { DashboardSummary } from "@/components/dashboard-summary";
+import { FiscalYearSummary } from "@/components/fiscal-year-summary";
 import { DeadlineBanner } from "@/components/deadline-banner";
-import { AccountLayout } from "@/components/account-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -98,30 +97,28 @@ export default function Receipts() {
 
   if (accountError || !account) {
     return (
-      <AccountLayout accountId={accountId}>
-        <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md w-full mx-4">
-            <CardHeader>
-              <CardTitle>Account Not Found</CardTitle>
-              <CardDescription>
-                This account could not be loaded. Please try switching to a different account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full" data-testid="button-switch-account-error">
-                <Link href="/accounts">
-                  Switch Account
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
-      </AccountLayout>
+      <main className="flex-1 flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4">
+          <CardHeader>
+            <CardTitle>Account Not Found</CardTitle>
+            <CardDescription>
+              This account could not be loaded. Please try switching to a different account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full" data-testid="button-switch-account-error">
+              <Link href="/accounts">
+                Switch Account
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   return (
-    <AccountLayout accountId={accountId}>
+    <>
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
@@ -168,7 +165,7 @@ export default function Receipts() {
         )}
 
         {/* Summary Cards - Only for eligible receipts */}
-        <DashboardSummary receipts={eligibleReceipts} fiscalYear={selectedFiscalYear} />
+        <FiscalYearSummary receipts={eligibleReceipts} fiscalYear={selectedFiscalYear} />
 
         {/* Eligible Receipts (Missouri) */}
         <div className="space-y-4">
@@ -187,7 +184,7 @@ export default function Receipts() {
                   No eligible Missouri receipts found{selectedFiscalYear ? ` for fiscal year ${selectedFiscalYear}` : ""}.
                 </p>
                 <Button asChild className="mt-4" data-testid="button-upload-receipt">
-                  <Link href={`/dashboard/${accountId}`}>
+                  <Link href={`/upload/${accountId}`}>
                     Upload Receipt
                   </Link>
                 </Button>
@@ -235,6 +232,6 @@ export default function Receipts() {
         )}
 
       </main>
-    </AccountLayout>
+    </>
   );
 }

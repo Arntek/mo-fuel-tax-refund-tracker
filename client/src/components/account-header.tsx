@@ -107,8 +107,8 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
       <div className="flex items-center gap-1 sm:gap-2">
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1 sm:gap-2" aria-label="Main navigation">
-          <Button variant="ghost" size="icon" data-testid="button-dashboard" aria-label="Dashboard" asChild>
-            <Link href={`/dashboard/${accountId}`}>
+          <Button variant="ghost" size="icon" data-testid="button-upload" aria-label="Upload" asChild>
+            <Link href={`/upload/${accountId}`}>
               <Upload className="w-4 h-4" />
             </Link>
           </Button>
@@ -167,10 +167,10 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
             </SheetTrigger>
             <SheetContent side="right" className="w-64">
               <nav id="mobile-nav" className="flex flex-col gap-4 mt-8" aria-label="Mobile navigation">
-                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-dashboard" asChild>
-                  <Link href={`/dashboard/${accountId}`} onClick={closeMenu}>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-upload" asChild>
+                  <Link href={`/upload/${accountId}`} onClick={closeMenu}>
                     <Upload className="w-5 h-5" />
-                    <span>Dashboard</span>
+                    <span>Upload</span>
                   </Link>
                 </Button>
                 <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-receipts" asChild>

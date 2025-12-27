@@ -3,7 +3,6 @@ import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { UploadZone } from "@/components/upload-zone";
 import { DeadlineBanner } from "@/components/deadline-banner";
-import { AccountLayout } from "@/components/account-layout";
 import { ReceiptModal } from "@/components/receipt-modal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,7 @@ function getCurrentFiscalYear(): string {
   return `${year - 1}-${year}`;
 }
 
-export default function Dashboard() {
+export default function Upload() {
   const params = useParams();
   const accountId = params.accountId || "";
   const [, setLocation] = useLocation();
@@ -120,37 +119,35 @@ export default function Dashboard() {
 
   if (accountError || !account) {
     return (
-      <AccountLayout accountId={accountId}>
-        <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md w-full mx-4">
-            <CardHeader>
-              <CardTitle>Account Not Found</CardTitle>
-              <CardDescription>
-                This account could not be loaded. Please try switching to a different account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full" data-testid="button-switch-account-error">
-                <Link href="/accounts">
-                  Switch Account
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
-      </AccountLayout>
+      <main className="flex-1 flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4">
+          <CardHeader>
+            <CardTitle>Account Not Found</CardTitle>
+            <CardDescription>
+              This account could not be loaded. Please try switching to a different account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full" data-testid="button-switch-account-error">
+              <Link href="/accounts">
+                Switch Account
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   const isProcessing = viewingReceipt && (viewingReceipt.processingStatus === "pending" || viewingReceipt.processingStatus === "processing");
 
   return (
-    <AccountLayout accountId={accountId}>
+    <>
       <DeadlineBanner />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Upload Receipt</h2>
+          <h2 className="text-2xl font-semibold">Upload Receipt</h2>
           
           {vehicles.length === 0 && (
             <Card className="border-destructive/50">
@@ -194,7 +191,7 @@ export default function Dashboard() {
                   </p>
                   <Progress value={Math.min(100, (subscriptionStatus.receiptCount / 8) * 100)} className="h-2 mt-2" />
                 </div>
-                <Button asChild className="gap-2" data-testid="button-upgrade-dashboard">
+                <Button asChild className="gap-2" data-testid="button-upgrade-upload">
                   <Link href={`/billing/${accountId}`}>
                     <CreditCard className="w-4 h-4" />
                     Subscribe Now
@@ -337,6 +334,6 @@ export default function Dashboard() {
           onClose={handleCloseModal}
         />
       )}
-    </AccountLayout>
+    </>
   );
 }

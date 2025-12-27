@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Receipt } from "@shared/schema";
 import { UploadZone } from "@/components/upload-zone";
-import { DashboardSummary } from "@/components/dashboard-summary";
+import { FiscalYearSummary } from "@/components/fiscal-year-summary";
 import { ReceiptTable } from "@/components/receipt-table";
 import { ExportSection } from "@/components/export-section";
 import { ReceiptModal } from "@/components/receipt-modal";
@@ -49,7 +49,7 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-8">
         <UploadZone />
 
-        <DashboardSummary receipts={fiscalYearReceipts} fiscalYear={currentFiscalYear} />
+        <FiscalYearSummary receipts={fiscalYearReceipts} fiscalYear={currentFiscalYear} />
 
         {isLoading ? (
           <div className="space-y-4">

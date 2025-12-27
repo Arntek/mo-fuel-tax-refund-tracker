@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, LayoutDashboard, FileDown, Sun, Moon } from "lucide-react";
+import { LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, Upload, FileDown, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -90,10 +90,10 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
 
   const menuItems = [
     {
-      title: "Dashboard",
-      url: accountId ? `/dashboard/${accountId}` : "#",
-      icon: LayoutDashboard,
-      testId: "button-dashboard",
+      title: "Upload",
+      url: accountId ? `/upload/${accountId}` : "#",
+      icon: Upload,
+      testId: "button-upload",
     },
     {
       title: "Receipts",

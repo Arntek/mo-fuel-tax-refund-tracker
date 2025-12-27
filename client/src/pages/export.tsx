@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { AccountLayout } from "@/components/account-layout";
 import { ExportSection } from "@/components/export-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,7 @@ export default function Export() {
   }
 
   if (!isAdminOrOwner) {
-    setLocation(`/dashboard/${accountId}`);
+    setLocation(`/upload/${accountId}`);
     return null;
   }
 
@@ -59,34 +58,30 @@ export default function Export() {
 
   if (accountError || !account) {
     return (
-      <AccountLayout accountId={accountId}>
-        <main className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md w-full mx-4">
-            <CardHeader>
-              <CardTitle>Account Not Found</CardTitle>
-              <CardDescription>
-                This account could not be loaded. Please try switching to a different account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full" data-testid="button-switch-account-error">
-                <Link href="/accounts">
-                  Switch Account
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </main>
-      </AccountLayout>
+      <main className="flex-1 flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4">
+          <CardHeader>
+            <CardTitle>Account Not Found</CardTitle>
+            <CardDescription>
+              This account could not be loaded. Please try switching to a different account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full" data-testid="button-switch-account-error">
+              <Link href="/accounts">
+                Switch Account
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   return (
-    <AccountLayout accountId={accountId}>
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
-        <h2 className="text-2xl font-semibold">Export Data</h2>
-        <ExportSection receipts={receipts} />
-      </main>
-    </AccountLayout>
+    <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
+      <h2 className="text-2xl font-semibold">Export Data</h2>
+      <ExportSection receipts={receipts} />
+    </main>
   );
 }
