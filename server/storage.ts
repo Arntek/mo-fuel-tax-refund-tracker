@@ -604,9 +604,13 @@ export class DbStorage implements IStorage {
   // Admin stats
   async getAdminStats(fiscalYear?: string): Promise<{
     totalRevenue: number;
+    netRevenue: number;
+    totalRefunded: number;
     paidAccounts: number;
     trialAccounts: number;
     totalAccounts: number;
+    discountCodesUsed: number;
+    totalDiscounted: number;
   }> {
     let subscriptionsQuery = db.select().from(schema.accountSubscriptions);
     
@@ -622,24 +626,30 @@ export class DbStorage implements IStorage {
     // Get all accounts for total count
     const allAccounts = await db.select().from(schema.accounts);
     
-    // Calculate revenue from paid subscriptions
-    // Get all plans to map fiscal year to price
-    const plans = await db.select().from(schema.fiscalYearPlans);
-    const planPriceMap = new Map(plans.map(p => [p.fiscalYear, p.priceInCents]));
+    // Calculate revenue from payment ledger (source of truth for accurate revenue with refunds)
+    const ledgerStats = await this.getLedgerStats(fiscalYear);
     
-    let totalRevenue = 0;
-    for (const sub of subscriptions) {
-      if (sub.status === "active" && sub.paidAt) {
-        const price = planPriceMap.get(sub.fiscalYear) || 0;
-        totalRevenue += price;
-      }
+    // Get discount code usage stats
+    let redemptionsQuery = db.select({
+      totalDiscounted: sql<number>`COALESCE(SUM(${schema.discountCodeRedemptions.amountDiscounted}), 0)`,
+      count: sql<number>`COUNT(*)`,
+    }).from(schema.discountCodeRedemptions);
+    
+    if (fiscalYear) {
+      redemptionsQuery = redemptionsQuery.where(eq(schema.discountCodeRedemptions.fiscalYear, fiscalYear)) as any;
     }
+    
+    const [redemptionStats] = await redemptionsQuery;
 
     return {
-      totalRevenue,
+      totalRevenue: ledgerStats.totalCaptured,
+      netRevenue: ledgerStats.netRevenue,
+      totalRefunded: ledgerStats.totalRefunded,
       paidAccounts,
       trialAccounts,
       totalAccounts: allAccounts.length,
+      discountCodesUsed: Number(redemptionStats?.count || 0),
+      totalDiscounted: Number(redemptionStats?.totalDiscounted || 0),
     };
   }
 
