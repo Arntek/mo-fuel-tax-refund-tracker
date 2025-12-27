@@ -32,7 +32,10 @@ import {
   Tag,
   Percent,
   Ban,
-  AlertTriangle
+  AlertTriangle,
+  ChevronRight,
+  X,
+  ExternalLink
 } from "lucide-react";
 import type { User, FiscalYearPlan } from "@shared/schema";
 import { format } from "date-fns";
@@ -107,6 +110,11 @@ export default function Admin() {
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [refundingPaymentId, setRefundingPaymentId] = useState<string | null>(null);
+  
+  // Drill-down selection state for Users tab
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  
   const [newDiscountCode, setNewDiscountCode] = useState({
     code: "",
     description: "",
@@ -311,6 +319,37 @@ export default function Admin() {
 
   const discountCodes = discountCodesData?.codes || [];
 
+  // Derived data for drill-down navigation
+  const selectedUser = selectedUserId ? users.find(u => u.id === selectedUserId) : null;
+  const userAccounts = selectedUserId 
+    ? accounts.filter(a => a.ownerEmail === selectedUser?.email)
+    : [];
+  const selectedAccount = selectedAccountId 
+    ? accounts.find(a => a.id === selectedAccountId) 
+    : null;
+  const accountPayments = selectedAccountId
+    ? payments.filter(p => p.accountId === selectedAccountId)
+    : [];
+
+  // Handle drill-down navigation
+  const handleSelectUser = (userId: string) => {
+    setSelectedUserId(userId);
+    setSelectedAccountId(null);
+  };
+
+  const handleSelectAccount = (accountId: string) => {
+    setSelectedAccountId(accountId);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedUserId(null);
+    setSelectedAccountId(null);
+  };
+
+  const handleBackToUser = () => {
+    setSelectedAccountId(null);
+  };
+
   if (!user?.isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -352,7 +391,21 @@ export default function Admin() {
       </header>
 
       <main className="container max-w-6xl mx-auto py-8 px-4">
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs 
+          defaultValue="overview" 
+          className="space-y-6"
+          onValueChange={(value) => {
+            // Clear search when switching to Users tab to avoid confusion
+            if (value === "users") {
+              setSearchQuery("");
+            }
+            // Clear drill-down selection when leaving Users tab
+            if (value !== "users") {
+              setSelectedUserId(null);
+              setSelectedAccountId(null);
+            }
+          }}
+        >
           <TabsList className="grid w-full max-w-2xl grid-cols-5">
             <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
               <TrendingUp className="w-4 h-4" />
@@ -929,69 +982,270 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          {/* Users Tab */}
-          <TabsContent value="users" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>All Users</CardTitle>
-                <CardDescription>
-                  View all users, their receipt counts, and manage admin access.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {usersLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : users.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No users found.
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead className="text-center">Accounts</TableHead>
-                        <TableHead className="text-center">Receipts</TableHead>
-                        <TableHead className="text-center">Stripe Customer</TableHead>
-                        <TableHead className="text-center">Admin</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((u) => (
-                        <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                          <TableCell className="font-medium">
-                            {u.firstName} {u.lastName}
-                          </TableCell>
-                          <TableCell>{u.email}</TableCell>
-                          <TableCell className="text-center">{u.accountCount}</TableCell>
-                          <TableCell className="text-center">{u.totalReceipts}</TableCell>
-                          <TableCell className="text-center">
-                            {u.stripeCustomerId ? (
-                              <Badge variant="outline" className="font-mono text-xs">
-                                {u.stripeCustomerId.substring(0, 14)}...
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={u.isAdmin}
-                              onCheckedChange={(checked) => toggleAdminMutation.mutate({ userId: u.id, isAdmin: checked })}
-                              disabled={u.id === user?.id}
-                              data-testid={`switch-admin-${u.id}`}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+          {/* Users Tab - Three Column Drill-Down Layout */}
+          <TabsContent value="users" className="space-y-4">
+            {/* Breadcrumb Navigation */}
+            {(selectedUserId || selectedAccountId) && (
+              <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-4 py-2">
+                <button
+                  onClick={handleClearSelection}
+                  className="text-primary hover:underline font-medium"
+                  data-testid="breadcrumb-users"
+                >
+                  Users
+                </button>
+                {selectedUser && (
+                  <>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    <button
+                      onClick={handleBackToUser}
+                      className={`font-medium ${selectedAccountId ? 'text-primary hover:underline' : 'text-foreground'}`}
+                      data-testid="breadcrumb-user"
+                    >
+                      {selectedUser.firstName} {selectedUser.lastName}
+                    </button>
+                  </>
                 )}
-              </CardContent>
-            </Card>
+                {selectedAccount && (
+                  <>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium text-foreground" data-testid="breadcrumb-account">
+                      {selectedAccount.name}
+                    </span>
+                  </>
+                )}
+                <div className="flex-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearSelection}
+                  className="gap-1 h-7"
+                  data-testid="button-clear-selection"
+                >
+                  <X className="w-3 h-3" />
+                  Clear
+                </Button>
+              </div>
+            )}
+
+            {/* Three Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Column 1: Users List */}
+              <Card className={`${selectedUserId ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Users
+                    <Badge variant="secondary" className="ml-auto">{users.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {usersLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : users.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No users found.
+                    </div>
+                  ) : (
+                    <div className="max-h-[500px] overflow-y-auto">
+                      {users.map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => handleSelectUser(u.id)}
+                          className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover-elevate flex items-center gap-3 ${
+                            selectedUserId === u.id ? 'bg-primary/10' : ''
+                          }`}
+                          data-testid={`row-user-${u.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate flex items-center gap-2">
+                              {u.firstName} {u.lastName}
+                              {u.isAdmin && (
+                                <Badge variant="default" className="text-xs py-0">Admin</Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground truncate">{u.email}</div>
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground">
+                            <div>{u.accountCount} accounts</div>
+                            <div>{u.totalReceipts} receipts</div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Column 2: Accounts for Selected User */}
+              {selectedUserId && (
+                <Card className={`${selectedAccountId ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Building2 className="w-4 h-4" />
+                      Accounts
+                      <Badge variant="secondary" className="ml-auto">{userAccounts.length}</Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Accounts owned by {selectedUser?.firstName} {selectedUser?.lastName}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {accountsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : userAccounts.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No accounts found for this user.
+                      </div>
+                    ) : (
+                      <div className="max-h-[500px] overflow-y-auto">
+                        {userAccounts.map((account) => (
+                          <button
+                            key={account.id}
+                            onClick={() => handleSelectAccount(account.id)}
+                            className={`w-full text-left px-4 py-3 border-b last:border-b-0 hover-elevate flex items-center gap-3 ${
+                              selectedAccountId === account.id ? 'bg-primary/10' : ''
+                            }`}
+                            data-testid={`row-account-${account.id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{account.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                FY {account.fiscalYear} • {account.receiptCount} receipts
+                              </div>
+                            </div>
+                            <Badge variant={
+                              account.status === 'paid' ? 'default' :
+                              account.status === 'trial' ? 'secondary' :
+                              'outline'
+                            }>
+                              {account.status === 'paid' ? 'Paid' :
+                               account.status === 'trial' ? 'Trial' :
+                               account.status}
+                            </Badge>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                  {/* Admin toggle for selected user */}
+                  {selectedUser && (
+                    <div className="border-t px-4 py-3 flex items-center justify-between bg-muted/30">
+                      <div className="text-sm">
+                        <span className="font-medium">Admin Access</span>
+                        <span className="text-muted-foreground ml-2">
+                          {selectedUser.isAdmin ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <Switch
+                        checked={selectedUser.isAdmin}
+                        onCheckedChange={(checked) => toggleAdminMutation.mutate({ userId: selectedUser.id, isAdmin: checked })}
+                        disabled={selectedUser.id === user?.id}
+                        data-testid={`switch-admin-${selectedUser.id}`}
+                      />
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Column 3: Payments for Selected Account */}
+              {selectedAccountId && (
+                <Card className="lg:col-span-1">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      Payments
+                      <Badge variant="secondary" className="ml-auto">{accountPayments.length}</Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Payments for {selectedAccount?.name}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {paymentsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : accountPayments.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No payments found for this account.
+                      </div>
+                    ) : (
+                      <div className="max-h-[400px] overflow-y-auto">
+                        {accountPayments.map((payment) => (
+                          <div
+                            key={payment.id}
+                            className="px-4 py-3 border-b last:border-b-0"
+                            data-testid={`payment-detail-${payment.id}`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-lg">
+                                ${(payment.amount / 100).toFixed(2)}
+                              </span>
+                              <Badge variant={
+                                payment.refunded ? "destructive" :
+                                payment.status === "succeeded" ? "default" :
+                                "outline"
+                              }>
+                                {payment.refunded ? "Refunded" :
+                                 payment.status === "succeeded" ? "Paid" :
+                                 payment.status}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <div>{format(new Date(payment.created * 1000), "MMM d, yyyy 'at' h:mm a")}</div>
+                              {payment.fiscalYear && <div>Fiscal Year: {payment.fiscalYear}</div>}
+                              <div className="font-mono text-xs truncate">{payment.id}</div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              {!payment.refunded && payment.status === "succeeded" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() => handleRefund(payment.id, selectedAccount?.name || "this payment")}
+                                  disabled={refundingPaymentId !== null}
+                                  data-testid={`button-refund-${payment.id}`}
+                                >
+                                  {refundingPaymentId === payment.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <RotateCcw className="w-3 h-3" />
+                                  )}
+                                  Refund
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                asChild
+                              >
+                                <a 
+                                  href={`https://dashboard.stripe.com/payments/${payment.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  data-testid={`link-stripe-${payment.id}`}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  Stripe
+                                </a>
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </main>
