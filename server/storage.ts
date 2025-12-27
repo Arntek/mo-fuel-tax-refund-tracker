@@ -32,6 +32,8 @@ import {
   type InsertPaymentLedgerEntry,
   type Invitation,
   type InsertInvitation,
+  type ReceiptPack,
+  type InsertReceiptPack,
 } from "@shared/schema";
 import ws from "ws";
 
@@ -110,6 +112,11 @@ export interface IStorage {
   getPendingInvitation(accountId: string, email: string): Promise<Invitation | undefined>;
   updateInvitationStatus(id: string, status: string): Promise<Invitation | undefined>;
   revokeInvitation(id: string): Promise<Invitation | undefined>;
+  
+  // Receipt pack operations
+  createReceiptPack(pack: InsertReceiptPack): Promise<ReceiptPack>;
+  getReceiptPacksByAccountAndFiscalYear(accountId: string, fiscalYear: string): Promise<ReceiptPack[]>;
+  getTotalReceiptsAddedByPacks(accountId: string, fiscalYear: string): Promise<number>;
 }
 
 export class DbStorage implements IStorage {
@@ -1099,6 +1106,38 @@ export class DbStorage implements IStorage {
 
   async revokeInvitation(id: string): Promise<Invitation | undefined> {
     return this.updateInvitationStatus(id, "revoked");
+  }
+
+  // Receipt pack operations
+  async createReceiptPack(pack: InsertReceiptPack): Promise<ReceiptPack> {
+    const [created] = await db.insert(schema.receiptPacks).values(pack).returning();
+    return created;
+  }
+
+  async getReceiptPacksByAccountAndFiscalYear(accountId: string, fiscalYear: string): Promise<ReceiptPack[]> {
+    return db
+      .select()
+      .from(schema.receiptPacks)
+      .where(
+        and(
+          eq(schema.receiptPacks.accountId, accountId),
+          eq(schema.receiptPacks.fiscalYear, fiscalYear)
+        )
+      )
+      .orderBy(desc(schema.receiptPacks.purchasedAt));
+  }
+
+  async getTotalReceiptsAddedByPacks(accountId: string, fiscalYear: string): Promise<number> {
+    const result = await db
+      .select({ total: sql<number>`COALESCE(SUM(${schema.receiptPacks.receiptsAdded}), 0)` })
+      .from(schema.receiptPacks)
+      .where(
+        and(
+          eq(schema.receiptPacks.accountId, accountId),
+          eq(schema.receiptPacks.fiscalYear, fiscalYear)
+        )
+      );
+    return Number(result[0]?.total || 0);
   }
 }
 

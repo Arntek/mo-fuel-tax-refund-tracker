@@ -141,6 +141,7 @@ export const fiscalYearPlans = pgTable("fiscal_year_plans", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   priceInCents: integer("price_in_cents").notNull().default(1200),
+  baseReceiptLimit: integer("base_receipt_limit").notNull().default(156),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   active: boolean("active").notNull().default(true),
@@ -155,6 +156,7 @@ export const accountSubscriptions = pgTable("account_subscriptions", {
   trialStartedAt: timestamp("trial_started_at"),
   trialEndsAt: timestamp("trial_ends_at"),
   receiptCount: integer("receipt_count").notNull().default(0),
+  receiptLimit: integer("receipt_limit").notNull().default(8),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
@@ -166,6 +168,19 @@ export const accountSubscriptions = pgTable("account_subscriptions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   accountFiscalYearIdx: index("account_subscription_idx").on(table.accountId, table.fiscalYear),
+}));
+
+export const receiptPacks = pgTable("receipt_packs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  fiscalYear: text("fiscal_year").notNull(),
+  receiptsAdded: integer("receipts_added").notNull().default(52),
+  priceInCents: integer("price_in_cents").notNull().default(500),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
+}, (table) => ({
+  accountFiscalYearIdx: index("receipt_pack_idx").on(table.accountId, table.fiscalYear),
 }));
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -229,6 +244,11 @@ export const insertFiscalYearPlanSchema = createInsertSchema(fiscalYearPlans).om
 export const insertAccountSubscriptionSchema = createInsertSchema(accountSubscriptions).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertReceiptPackSchema = createInsertSchema(receiptPacks).omit({
+  id: true,
+  purchasedAt: true,
 });
 
 export const invitations = pgTable("invitations", {
@@ -357,6 +377,9 @@ export type InsertFiscalYearPlan = z.infer<typeof insertFiscalYearPlanSchema>;
 
 export type AccountSubscription = typeof accountSubscriptions.$inferSelect;
 export type InsertAccountSubscription = z.infer<typeof insertAccountSubscriptionSchema>;
+
+export type ReceiptPack = typeof receiptPacks.$inferSelect;
+export type InsertReceiptPack = z.infer<typeof insertReceiptPackSchema>;
 
 export type Invitation = typeof invitations.$inferSelect;
 export type InsertInvitation = z.infer<typeof insertInvitationSchema>;

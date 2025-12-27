@@ -1647,6 +1647,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Purchase receipt pack (add more receipt uploads to a fiscal year)
+  app.post("/api/accounts/:accountId/purchase-receipt-pack", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
+    try {
+      if (!stripeService.isStripeConfigured()) {
+        return res.status(503).json({ 
+          error: "Stripe not configured", 
+          message: "Payments are temporarily unavailable" 
+        });
+      }
+
+      const { fiscalYear, packCount = 1 } = req.body;
+      if (!fiscalYear) {
+        return res.status(400).json({ error: "Fiscal year is required" });
+      }
+
+      // Check if the user has an active subscription for this fiscal year
+      const subscriptionStatus = await stripeService.getSubscriptionStatus(req.accountId, fiscalYear);
+      if (subscriptionStatus.status !== "active") {
+        return res.status(400).json({ 
+          error: "Active subscription required", 
+          message: "You must have an active subscription before purchasing additional receipts" 
+        });
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const successUrl = `${baseUrl}/billing/${req.accountId}?payment=success&pack=true`;
+      const cancelUrl = `${baseUrl}/billing/${req.accountId}?payment=canceled`;
+
+      const checkoutUrl = await stripeService.createReceiptPackCheckoutSession(
+        req.accountId,
+        req.userId,
+        fiscalYear,
+        successUrl,
+        cancelUrl,
+        packCount
+      );
+
+      res.json({ url: checkoutUrl });
+    } catch (error) {
+      console.error("Error creating receipt pack checkout session:", error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  // Get receipt pack purchase history
+  app.get("/api/accounts/:accountId/receipt-packs", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
+    try {
+      const { fiscalYear } = req.query;
+      if (!fiscalYear) {
+        return res.status(400).json({ error: "Fiscal year is required" });
+      }
+
+      const packs = await storage.getReceiptPacksByAccountAndFiscalYear(req.accountId, fiscalYear as string);
+      const totalAdded = await storage.getTotalReceiptsAddedByPacks(req.accountId, fiscalYear as string);
+
+      res.json({ packs, totalAdded });
+    } catch (error) {
+      console.error("Error getting receipt packs:", error);
+      res.status(500).json({ error: "Failed to get receipt packs" });
+    }
+  });
+
   app.get("/api/billing/plans", async (req, res) => {
     try {
       const plans = await storage.getActiveFiscalYearPlans();

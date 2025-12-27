@@ -1,7 +1,13 @@
 import Stripe from "stripe";
 import { db, storage } from "./storage";
-import { users, fiscalYearPlans, accountSubscriptions, accounts, paymentLedger } from "@shared/schema";
+import { users, fiscalYearPlans, accountSubscriptions, accounts, paymentLedger, receiptPacks } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+
+// Pricing constants
+export const BASE_PLAN_PRICE_CENTS = 1200; // $12
+export const BASE_RECEIPT_LIMIT = 156; // 3 per week for 52 weeks
+export const RECEIPT_PACK_PRICE_CENTS = 500; // $5
+export const RECEIPT_PACK_SIZE = 52; // 1 per week for a year
 
 function getStripeInstance(): Stripe | null {
   const apiKey = process.env.STRIPE_SECRET_KEY;
@@ -192,6 +198,59 @@ export async function createBillingPortalSession(userId: string, returnUrl: stri
   return session.url;
 }
 
+export async function createReceiptPackCheckoutSession(
+  accountId: string,
+  userId: string,
+  fiscalYear: string,
+  successUrl: string,
+  cancelUrl: string,
+  packCount: number = 1
+): Promise<string> {
+  const customerId = await getOrCreateStripeCustomer(userId);
+  const totalReceiptsAdded = packCount * RECEIPT_PACK_SIZE;
+  const totalPrice = packCount * RECEIPT_PACK_PRICE_CENTS;
+
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    customer: customerId,
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `Receipt Pack (${totalReceiptsAdded} receipts)`,
+            description: `Add ${totalReceiptsAdded} additional receipt uploads for fiscal year ${fiscalYear}`,
+          },
+          unit_amount: totalPrice,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      accountId,
+      userId,
+      fiscalYear,
+      productType: "receipt_pack",
+      packSize: String(totalReceiptsAdded),
+    },
+    payment_intent_data: {
+      metadata: {
+        accountId,
+        userId,
+        fiscalYear,
+        productType: "receipt_pack",
+        packSize: String(totalReceiptsAdded),
+      },
+      description: `Receipt Pack - ${totalReceiptsAdded} additional receipts for FY ${fiscalYear}`,
+    },
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+  };
+
+  const session = await requireStripe().checkout.sessions.create(sessionParams);
+  return session.url || "";
+}
+
 export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
   console.log(`[Stripe Webhook] Processing event: ${event.type}`);
   
@@ -203,38 +262,79 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
       console.log(`[Stripe Webhook] checkout.session.completed - accountId: ${accountId}, fiscalYear: ${fiscalYear}, discountCodeId: ${discountCodeId}`);
 
       if (accountId && fiscalYear) {
-        const existingSub = await db.select().from(accountSubscriptions)
-          .where(and(
-            eq(accountSubscriptions.accountId, accountId),
-            eq(accountSubscriptions.fiscalYear, fiscalYear)
-          ));
-
-        const now = new Date();
-        const subscriptionData = {
-          status: "active" as const,
-          stripeCustomerId: session.customer as string,
-          stripePaymentIntentId: session.payment_intent as string,
-          stripeCheckoutSessionId: session.id,
-          currentPeriodStart: now,
-          currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
-          paidAt: now,
-        };
-
-        if (existingSub.length > 0) {
-          console.log(`[Stripe Webhook] Updating existing subscription for account ${accountId}`);
+        // Check if this is a receipt pack purchase
+        const isReceiptPack = session.metadata?.productType === "receipt_pack";
+        
+        if (isReceiptPack) {
+          // Handle receipt pack purchase
+          const packSize = parseInt(session.metadata?.packSize || String(RECEIPT_PACK_SIZE));
+          const priceInCents = session.amount_total || RECEIPT_PACK_PRICE_CENTS;
+          
+          // Create receipt pack record
+          await storage.createReceiptPack({
+            accountId,
+            fiscalYear,
+            receiptsAdded: packSize,
+            priceInCents,
+            stripePaymentIntentId: session.payment_intent as string,
+            stripeCheckoutSessionId: session.id,
+          });
+          
+          // Update subscription's receiptLimit
+          const totalFromPacks = await storage.getTotalReceiptsAddedByPacks(accountId, fiscalYear);
+          const [plan] = await db.select().from(fiscalYearPlans)
+            .where(eq(fiscalYearPlans.fiscalYear, fiscalYear));
+          const baseLimit = plan?.baseReceiptLimit || BASE_RECEIPT_LIMIT;
+          
           await db.update(accountSubscriptions)
-            .set(subscriptionData)
+            .set({ receiptLimit: baseLimit + totalFromPacks })
             .where(and(
               eq(accountSubscriptions.accountId, accountId),
               eq(accountSubscriptions.fiscalYear, fiscalYear)
             ));
+          
+          console.log(`[Stripe Webhook] Receipt pack purchased for account ${accountId}, new limit: ${baseLimit + totalFromPacks}`);
         } else {
-          console.log(`[Stripe Webhook] Creating new subscription for account ${accountId}`);
-          await db.insert(accountSubscriptions).values({
-            accountId,
-            fiscalYear,
-            ...subscriptionData,
-          });
+          // Handle regular subscription purchase
+          const existingSub = await db.select().from(accountSubscriptions)
+            .where(and(
+              eq(accountSubscriptions.accountId, accountId),
+              eq(accountSubscriptions.fiscalYear, fiscalYear)
+            ));
+
+          // Get the base receipt limit from the plan
+          const [plan] = await db.select().from(fiscalYearPlans)
+            .where(eq(fiscalYearPlans.fiscalYear, fiscalYear));
+          const baseReceiptLimit = plan?.baseReceiptLimit || BASE_RECEIPT_LIMIT;
+
+          const now = new Date();
+          const subscriptionData = {
+            status: "active" as const,
+            stripeCustomerId: session.customer as string,
+            stripePaymentIntentId: session.payment_intent as string,
+            stripeCheckoutSessionId: session.id,
+            currentPeriodStart: now,
+            currentPeriodEnd: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
+            paidAt: now,
+            receiptLimit: baseReceiptLimit,
+          };
+
+          if (existingSub.length > 0) {
+            console.log(`[Stripe Webhook] Updating existing subscription for account ${accountId}`);
+            await db.update(accountSubscriptions)
+              .set(subscriptionData)
+              .where(and(
+                eq(accountSubscriptions.accountId, accountId),
+                eq(accountSubscriptions.fiscalYear, fiscalYear)
+              ));
+          } else {
+            console.log(`[Stripe Webhook] Creating new subscription for account ${accountId}`);
+            await db.insert(accountSubscriptions).values({
+              accountId,
+              fiscalYear,
+              ...subscriptionData,
+            });
+          }
         }
 
         // Create payment ledger entry
@@ -504,9 +604,13 @@ export async function getSubscriptionStatus(
   status: string;
   trialDaysRemaining: number | null;
   receiptCount: number;
+  receiptLimit: number;
   canUpload: boolean;
   upgradeRequired: boolean;
+  needsMoreReceipts: boolean;
 }> {
+  const TRIAL_RECEIPT_LIMIT = 8;
+  
   const [subscription] = await db.select().from(accountSubscriptions)
     .where(and(
       eq(accountSubscriptions.accountId, accountId),
@@ -518,18 +622,24 @@ export async function getSubscriptionStatus(
       status: "trial",
       trialDaysRemaining: 30,
       receiptCount: 0,
+      receiptLimit: TRIAL_RECEIPT_LIMIT,
       canUpload: true,
       upgradeRequired: false,
+      needsMoreReceipts: false,
     };
   }
 
   if (subscription.status === "active") {
+    const receiptLimit = subscription.receiptLimit || BASE_RECEIPT_LIMIT;
+    const receiptLimitReached = subscription.receiptCount >= receiptLimit;
     return {
       status: "active",
       trialDaysRemaining: null,
       receiptCount: subscription.receiptCount,
-      canUpload: true,
+      receiptLimit,
+      canUpload: !receiptLimitReached,
       upgradeRequired: false,
+      needsMoreReceipts: receiptLimitReached,
     };
   }
 
@@ -540,15 +650,17 @@ export async function getSubscriptionStatus(
     : null;
 
   const trialExpired = trialEndsAt ? now > trialEndsAt : false;
-  const receiptLimitReached = subscription.receiptCount >= 8;
+  const receiptLimitReached = subscription.receiptCount >= (subscription.receiptLimit || TRIAL_RECEIPT_LIMIT);
   const upgradeRequired = trialExpired || receiptLimitReached;
 
   return {
     status: subscription.status,
     trialDaysRemaining,
     receiptCount: subscription.receiptCount,
+    receiptLimit: subscription.receiptLimit || TRIAL_RECEIPT_LIMIT,
     canUpload: !upgradeRequired,
     upgradeRequired,
+    needsMoreReceipts: false,
   };
 }
 

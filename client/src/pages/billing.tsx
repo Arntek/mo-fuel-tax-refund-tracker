@@ -7,17 +7,23 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { CreditCard, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText, Receipt } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CreditCard, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText, Receipt, Plus } from "lucide-react";
 import type { Account, FiscalYearPlan } from "@shared/schema";
 import { Helmet } from "react-helmet";
+
+// Pricing constants (match server)
+const RECEIPT_PACK_PRICE_CENTS = 500;
+const RECEIPT_PACK_SIZE = 52;
 
 type SubscriptionStatus = {
   status: "trial" | "active" | "expired" | "cancelled";
   trialDaysRemaining: number | null;
   receiptCount: number;
+  receiptLimit: number;
   canUpload: boolean;
   upgradeRequired: boolean;
+  needsMoreReceipts: boolean;
 };
 
 type Payment = {
@@ -122,6 +128,29 @@ export default function Billing() {
     },
   });
 
+  const purchaseReceiptPackMutation = useMutation({
+    mutationFn: async (fiscalYear: string) => {
+      const response = await apiRequest(`/api/accounts/${accountId}/purchase-receipt-pack`, {
+        method: "POST",
+        body: JSON.stringify({
+          fiscalYear,
+          packCount: 1,
+        }),
+      });
+      return response;
+    },
+    onSuccess: (data) => {
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "subscription"] });
+      }
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to start checkout for receipt pack", variant: "destructive" });
+    },
+  });
+
   const currentPlan = plans.find((p) => p.fiscalYear === currentFiscalYear);
 
   if (roleLoading) {
@@ -135,7 +164,9 @@ export default function Billing() {
   if (!isAdminOrOwner) {
     return null;
   }
-  const trialProgress = subscriptionStatus ? Math.min(100, (subscriptionStatus.receiptCount / 8) * 100) : 0;
+  const receiptProgress = subscriptionStatus 
+    ? Math.min(100, (subscriptionStatus.receiptCount / subscriptionStatus.receiptLimit) * 100) 
+    : 0;
 
   return (
     <>
@@ -189,10 +220,10 @@ export default function Billing() {
                       <div className="flex items-center justify-between text-sm">
                         <span>Trial Receipt Usage</span>
                         <span className="font-medium">
-                          {subscriptionStatus.receiptCount} / 8 receipts
+                          {subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit} receipts
                         </span>
                       </div>
-                      <Progress value={trialProgress} className="h-2" />
+                      <Progress value={receiptProgress} className="h-2" />
 
                       {subscriptionStatus.trialDaysRemaining !== null && (
                         <div className="flex items-center justify-between text-sm">
@@ -212,8 +243,8 @@ export default function Billing() {
                                 Trial Limit Reached
                               </p>
                               <p className="text-sm text-amber-700 dark:text-amber-300">
-                                {subscriptionStatus.receiptCount >= 8
-                                  ? "You've uploaded 8 receipts."
+                                {subscriptionStatus.receiptCount >= subscriptionStatus.receiptLimit
+                                  ? `You've uploaded ${subscriptionStatus.receiptLimit} receipts.`
                                   : "Your 30-day trial has ended."}
                                 {" "}Subscribe to continue uploading receipts for this fiscal year.
                               </p>
@@ -232,7 +263,10 @@ export default function Billing() {
                       <div className="space-y-1">
                         <p className="font-medium">{currentPlan.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Unlimited receipt uploads for {currentFiscalYear}
+                          {currentPlan.baseReceiptLimit} receipt uploads for {currentFiscalYear}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Need more? Add {RECEIPT_PACK_SIZE} receipts for ${(RECEIPT_PACK_PRICE_CENTS / 100).toFixed(2)} each
                         </p>
                       </div>
                       <div className="text-right">
@@ -262,19 +296,84 @@ export default function Billing() {
                 )}
 
                 {subscriptionStatus.status === "active" && (
-                  <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="font-medium text-green-800 dark:text-green-200">
-                          Subscription Active
-                        </p>
-                        <p className="text-sm text-green-700 dark:text-green-300">
-                          You have unlimited receipt uploads for {currentFiscalYear}.
-                        </p>
+                  <>
+                    <Separator />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Receipt Usage</span>
+                        <span className="font-medium">
+                          {subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit} receipts
+                        </span>
                       </div>
+                      <Progress value={receiptProgress} className="h-2" />
+                      
+                      {subscriptionStatus.needsMoreReceipts ? (
+                        <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                            <div className="flex-1 space-y-3">
+                              <div className="space-y-1">
+                                <p className="font-medium text-amber-800 dark:text-amber-200">
+                                  Receipt Limit Reached
+                                </p>
+                                <p className="text-sm text-amber-700 dark:text-amber-300">
+                                  You've used all {subscriptionStatus.receiptLimit} receipts. Purchase additional receipts to continue uploading.
+                                </p>
+                              </div>
+                              <Button
+                                onClick={() => purchaseReceiptPackMutation.mutate(currentFiscalYear)}
+                                disabled={purchaseReceiptPackMutation.isPending}
+                                className="gap-2"
+                                data-testid="button-buy-more-receipts"
+                              >
+                                {purchaseReceiptPackMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4" />
+                                    Add {RECEIPT_PACK_SIZE} Receipts (${(RECEIPT_PACK_PRICE_CENTS / 100).toFixed(2)})
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+                            <div className="flex-1 space-y-3">
+                              <div className="space-y-1">
+                                <p className="font-medium text-green-800 dark:text-green-200">
+                                  Subscription Active
+                                </p>
+                                <p className="text-sm text-green-700 dark:text-green-300">
+                                  You have {subscriptionStatus.receiptLimit - subscriptionStatus.receiptCount} receipts remaining for {currentFiscalYear}.
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => purchaseReceiptPackMutation.mutate(currentFiscalYear)}
+                                disabled={purchaseReceiptPackMutation.isPending}
+                                className="gap-2"
+                                data-testid="button-add-receipts"
+                              >
+                                {purchaseReceiptPackMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4" />
+                                    Add {RECEIPT_PACK_SIZE} Receipts (${(RECEIPT_PACK_PRICE_CENTS / 100).toFixed(2)})
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </>
                 )}
               </>
             ) : (

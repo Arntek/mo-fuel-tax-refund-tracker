@@ -16,8 +16,10 @@ type SubscriptionStatus = {
   status: "trial" | "active" | "expired" | "cancelled";
   trialDaysRemaining: number | null;
   receiptCount: number;
+  receiptLimit: number;
   canUpload: boolean;
   upgradeRequired: boolean;
+  needsMoreReceipts: boolean;
 };
 
 type Account = any;
@@ -57,7 +59,15 @@ export default function Upload() {
     queryKey: ["/api/accounts", accountId, "subscription", currentFiscalYear],
     queryFn: async () => {
       const response = await fetch(`/api/accounts/${accountId}/subscription?fiscalYear=${currentFiscalYear}`);
-      if (!response.ok) return { status: "trial", trialDaysRemaining: 30, receiptCount: 0, canUpload: true, upgradeRequired: false };
+      if (!response.ok) return { 
+        status: "trial" as const, 
+        trialDaysRemaining: 30, 
+        receiptCount: 0, 
+        receiptLimit: 8,
+        canUpload: true, 
+        upgradeRequired: false,
+        needsMoreReceipts: false 
+      };
       return response.json();
     },
     enabled: !!accountId,
@@ -180,26 +190,58 @@ export default function Upload() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
                   <AlertTriangle className="w-5 h-5" />
-                  Upgrade Required
+                  {subscriptionStatus.status === "trial" ? "Upgrade Required" : "Need More Receipts"}
                 </CardTitle>
                 <CardDescription className="text-amber-700 dark:text-amber-300">
-                  {subscriptionStatus.receiptCount >= 8 
-                    ? `You've reached the 8-receipt trial limit for ${currentFiscalYear}.`
-                    : `Your 30-day trial for ${currentFiscalYear} has ended.`}
-                  {" "}Subscribe to continue uploading receipts.
+                  {subscriptionStatus.status === "trial" ? (
+                    subscriptionStatus.receiptCount >= subscriptionStatus.receiptLimit
+                      ? `You've reached the ${subscriptionStatus.receiptLimit}-receipt trial limit for ${currentFiscalYear}.`
+                      : `Your 30-day trial for ${currentFiscalYear} has ended.`
+                  ) : (
+                    `You've used all ${subscriptionStatus.receiptLimit} receipts for ${currentFiscalYear}.`
+                  )}
+                  {" "}{subscriptionStatus.status === "trial" ? "Subscribe to continue uploading receipts." : "Purchase additional receipts to continue uploading."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">
-                    Receipts uploaded: <span className="font-medium">{subscriptionStatus.receiptCount} / 8</span>
+                    Receipts uploaded: <span className="font-medium">{subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit}</span>
                   </p>
-                  <Progress value={Math.min(100, (subscriptionStatus.receiptCount / 8) * 100)} className="h-2 mt-2" />
+                  <Progress value={Math.min(100, (subscriptionStatus.receiptCount / subscriptionStatus.receiptLimit) * 100)} className="h-2 mt-2" />
                 </div>
                 <Button asChild className="gap-2" data-testid="button-upgrade-upload">
                   <Link href={`/billing/${accountId}`}>
                     <CreditCard className="w-4 h-4" />
-                    Subscribe Now
+                    {subscriptionStatus.status === "trial" ? "Subscribe Now" : "Buy More Receipts"}
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {subscriptionStatus?.needsMoreReceipts && !subscriptionStatus?.upgradeRequired && (
+            <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                  <AlertTriangle className="w-5 h-5" />
+                  Need More Receipts
+                </CardTitle>
+                <CardDescription className="text-amber-700 dark:text-amber-300">
+                  You've used all {subscriptionStatus.receiptLimit} receipts for {currentFiscalYear}. Purchase additional receipts to continue uploading.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    Receipts uploaded: <span className="font-medium">{subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit}</span>
+                  </p>
+                  <Progress value={Math.min(100, (subscriptionStatus.receiptCount / subscriptionStatus.receiptLimit) * 100)} className="h-2 mt-2" />
+                </div>
+                <Button asChild className="gap-2" data-testid="button-buy-more-upload">
+                  <Link href={`/billing/${accountId}`}>
+                    <CreditCard className="w-4 h-4" />
+                    Buy More Receipts
                   </Link>
                 </Button>
               </CardContent>
@@ -211,7 +253,7 @@ export default function Upload() {
               <CardContent className="py-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="text-sm text-muted-foreground">
-                    Trial: <span className="font-medium text-foreground">{subscriptionStatus.receiptCount}/8 receipts</span>
+                    Trial: <span className="font-medium text-foreground">{subscriptionStatus.receiptCount}/{subscriptionStatus.receiptLimit} receipts</span>
                     {subscriptionStatus.trialDaysRemaining !== null && (
                       <span className="ml-2">
                         • <span className="font-medium text-foreground">{subscriptionStatus.trialDaysRemaining} days</span> remaining
@@ -228,7 +270,27 @@ export default function Upload() {
             </Card>
           )}
 
-          {vehicles.length > 0 && !subscriptionStatus?.upgradeRequired && (
+          {subscriptionStatus?.status === "active" && !subscriptionStatus?.needsMoreReceipts && (
+            <Card className="border-muted">
+              <CardContent className="py-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    Active: <span className="font-medium text-foreground">{subscriptionStatus.receiptCount}/{subscriptionStatus.receiptLimit} receipts</span>
+                    <span className="ml-2 text-green-600">
+                      • {subscriptionStatus.receiptLimit - subscriptionStatus.receiptCount} remaining
+                    </span>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild className="text-xs">
+                    <Link href={`/billing/${accountId}`}>
+                      View Subscription
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {vehicles.length > 0 && !subscriptionStatus?.upgradeRequired && !subscriptionStatus?.needsMoreReceipts && (
             <>
               {/* Step 1: Select Vehicle */}
               <Card>

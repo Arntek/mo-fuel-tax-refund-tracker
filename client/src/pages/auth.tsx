@@ -193,12 +193,17 @@ export default function Auth() {
                   <CardTitle className="text-2xl">Simple Pricing</CardTitle>
                 </div>
                 <div className="text-4xl font-bold text-primary">$12</div>
-                <CardDescription className="text-base">per fiscal year</CardDescription>
+                <CardDescription className="text-base">per fiscal year (156 receipts)</CardDescription>
               </CardHeader>
               <CardContent className="text-center space-y-3">
                 <p className="text-lg font-medium text-foreground">Free trial included</p>
                 <p className="text-sm text-muted-foreground">30 days or 8 receipts, whichever comes first</p>
                 <p className="text-sm text-muted-foreground">No credit card required to start</p>
+                <div className="pt-2 border-t border-border/50">
+                  <p className="text-sm text-muted-foreground">
+                    Need more? Add 52 receipts for <span className="font-medium text-foreground">$5</span> anytime
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
