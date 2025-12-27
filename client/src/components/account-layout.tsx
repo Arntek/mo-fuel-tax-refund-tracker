@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Upload, Settings, LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard } from "lucide-react";
+import { Upload, Settings, LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, LayoutDashboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
@@ -11,6 +11,19 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarHeader,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
 
 type Account = any;
 
@@ -21,7 +34,7 @@ interface AccountLayoutProps {
 }
 
 export function AccountLayout({ accountId, children, settingsContent }: AccountLayoutProps) {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -70,155 +83,181 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
     );
   }
 
+  const menuItems = [
+    {
+      title: "Dashboard",
+      url: `/dashboard/${accountId}`,
+      icon: LayoutDashboard,
+      testId: "button-dashboard",
+    },
+    {
+      title: "Receipts",
+      url: `/receipts/${accountId}`,
+      icon: Receipt,
+      testId: "button-receipts",
+    },
+    ...(isAdminOrOwner ? [
+      {
+        title: "People",
+        url: `/people/${accountId}`,
+        icon: Users,
+        testId: "button-people",
+      },
+    ] : []),
+    {
+      title: "Vehicles",
+      url: `/vehicles/${accountId}`,
+      icon: Car,
+      testId: "button-vehicles",
+    },
+    ...(isAdminOrOwner ? [
+      {
+        title: "Billing",
+        url: `/billing/${accountId}`,
+        icon: CreditCard,
+        testId: "button-billing",
+      },
+    ] : []),
+  ];
+
+  const sidebarStyle = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "4rem",
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 bg-background z-50">
-        <div className="flex items-center gap-2 sm:gap-4">
-          <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-          <button 
-            onClick={handleSwitchAccount}
-            className="text-left hover-elevate active-elevate-2 rounded-md px-2 py-1 flex items-center gap-1"
-            data-testid="button-account-name"
-          >
-            <div>
-              <h1 className="text-base sm:text-lg font-semibold">{account?.name || "Receipt Tracker"}</h1>
-              <p className="text-xs text-muted-foreground">
-                {account?.type === "family" ? "Family" : "Business"} Account
-              </p>
+    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <div className="flex h-screen w-full bg-background overflow-hidden">
+        {/* Desktop Sidebar */}
+        <Sidebar collapsible="icon" className="hidden sm:flex border-r">
+          <SidebarHeader className="p-4 border-b">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Receipt className="h-5 w-5" />
+              </div>
+              <div className="flex flex-col group-data-[collapsible=icon]:hidden overflow-hidden">
+                <span className="truncate font-semibold text-sm leading-tight">
+                  {account?.name || "Arntek"}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {account?.type === "family" ? "Family" : "Business"}
+                </span>
+              </div>
             </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Navigation</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {menuItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton 
+                        asChild 
+                        tooltip={item.title}
+                        isActive={location === item.url}
+                        data-testid={item.testId}
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter className="p-4 border-t">
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleSwitchAccount} tooltip="Switch Account">
+                  <ChevronDown className="h-4 w-4 rotate-90" />
+                  <span>Switch Account</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
 
-        <div className="hidden sm:flex items-center gap-1 sm:gap-2">
-          <Link href={`/dashboard/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-dashboard">
-              <Upload className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Link href={`/receipts/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-receipts">
-              <Receipt className="w-4 h-4" />
-            </Button>
-          </Link>
-          {isAdminOrOwner && (
-            <Link href={`/people/${accountId}`}>
-              <Button variant="ghost" size="icon" data-testid="button-people">
-                <Users className="w-4 h-4" />
-              </Button>
-            </Link>
-          )}
-          <Link href={`/vehicles/${accountId}`}>
-            <Button variant="ghost" size="icon" data-testid="button-vehicles">
-              <Car className="w-4 h-4" />
-            </Button>
-          </Link>
-          {isAdminOrOwner && (
-            <Link href={`/billing/${accountId}`}>
-              <Button variant="ghost" size="icon" data-testid="button-billing">
-                <CreditCard className="w-4 h-4" />
-              </Button>
-            </Link>
-          )}
-          {isAdminOrOwner && settingsContent && (
-            <Button variant="ghost" size="icon" data-testid="button-settings">
-              <Settings className="w-4 h-4" />
-            </Button>
-          )}
-          <ThemeToggle />
-          <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <header className="flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6 sticky top-0 z-40">
+            {/* Mobile Nav Toggle */}
+            <div className="flex sm:hidden items-center gap-2">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0">
+                  <div className="flex flex-col h-full">
+                    <div className="p-6 border-b">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Receipt className="h-6 w-6 text-primary" />
+                        <span className="font-bold text-lg">Arntek</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{account?.name}</p>
+                    </div>
+                    <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+                      {menuItems.map((item) => (
+                        <Link key={item.title} href={item.url}>
+                          <Button 
+                            variant={location === item.url ? "secondary" : "ghost"}
+                            className="w-full justify-start gap-3 px-3 h-11"
+                            onClick={() => setMobileMenuOpen(false)}
+                            data-testid={`mobile-${item.testId}`}
+                          >
+                            <item.icon className="h-5 w-5" />
+                            {item.title}
+                          </Button>
+                        </Link>
+                      ))}
+                    </nav>
+                    <div className="p-4 border-t space-y-2">
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start gap-3 h-11"
+                        onClick={handleSwitchAccount}
+                      >
+                        <ChevronDown className="h-5 w-5 rotate-90" />
+                        Switch Account
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start gap-3 h-11 text-destructive hover:text-destructive"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="h-5 w-5" />
+                        Logout
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <div className="font-semibold truncate max-w-[150px]">{account?.name}</div>
+            </div>
 
-        <div className="flex sm:hidden items-center gap-2">
-          <ThemeToggle />
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-64">
-              <nav className="flex flex-col gap-2 mt-8">
-                <Link href={`/dashboard/${accountId}`}>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start gap-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                    data-testid="mobile-link-dashboard"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Dashboard
-                  </Button>
-                </Link>
-                <Link href={`/receipts/${accountId}`}>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start gap-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                    data-testid="mobile-link-receipts"
-                  >
-                    <Receipt className="w-4 h-4" />
-                    Receipts
-                  </Button>
-                </Link>
-                {isAdminOrOwner && (
-                  <Link href={`/people/${accountId}`}>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start gap-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-link-people"
-                    >
-                      <Users className="w-4 h-4" />
-                      People
-                    </Button>
-                  </Link>
-                )}
-                <Link href={`/vehicles/${accountId}`}>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start gap-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                    data-testid="mobile-link-vehicles"
-                  >
-                    <Car className="w-4 h-4" />
-                    Vehicles
-                  </Button>
-                </Link>
-                {isAdminOrOwner && (
-                  <Link href={`/billing/${accountId}`}>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start gap-2"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-link-billing"
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      Billing
-                    </Button>
-                  </Link>
-                )}
-                <div className="border-t my-2" />
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start gap-2"
-                  onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                  data-testid="mobile-button-logout"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </Button>
-              </nav>
-            </SheetContent>
-          </Sheet>
+            <div className="flex-1 group-data-[collapsible=icon]:sm:ml-0" />
+            
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+            </div>
+          </header>
+
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
         </div>
-      </header>
-      {children}
-    </div>
+      </div>
+    </SidebarProvider>
   );
 }
