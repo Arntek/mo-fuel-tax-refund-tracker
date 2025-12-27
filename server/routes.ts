@@ -1429,10 +1429,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { fiscalYear } = req.body;
+      const { fiscalYear, discountCode } = req.body;
       
       if (!fiscalYear) {
         return res.status(400).json({ error: "Fiscal year required" });
+      }
+
+      let discountCodeId: string | undefined;
+      let stripePromotionCodeId: string | null = null;
+
+      // Validate and lookup discount code if provided
+      if (discountCode) {
+        const code = await storage.getDiscountCodeByCode(discountCode.toUpperCase());
+        
+        if (!code) {
+          return res.status(400).json({ error: "Invalid discount code" });
+        }
+        
+        if (!code.active) {
+          return res.status(400).json({ error: "This discount code is no longer active" });
+        }
+        
+        if (code.expiresAt && new Date() > code.expiresAt) {
+          return res.status(400).json({ error: "This discount code has expired" });
+        }
+        
+        if (code.maxRedemptions && code.redemptionCount >= code.maxRedemptions) {
+          return res.status(400).json({ error: "This discount code has reached its maximum redemptions" });
+        }
+        
+        if (code.fiscalYear && code.fiscalYear !== fiscalYear) {
+          return res.status(400).json({ error: "This discount code is not valid for the selected fiscal year" });
+        }
+        
+        discountCodeId = code.id;
+        stripePromotionCodeId = code.stripePromotionCodeId;
       }
 
       const baseUrl = `${req.protocol}://${req.get("host")}`;
@@ -1444,7 +1475,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.userId,
         fiscalYear,
         successUrl,
-        cancelUrl
+        cancelUrl,
+        {
+          discountCodeId,
+          stripePromotionCodeId,
+        }
       );
 
       res.json({ url: checkoutUrl });

@@ -125,7 +125,11 @@ export async function createCheckoutSession(
   userId: string,
   fiscalYear: string,
   successUrl: string,
-  cancelUrl: string
+  cancelUrl: string,
+  options?: {
+    discountCodeId?: string;
+    stripePromotionCodeId?: string | null;
+  }
 ): Promise<string> {
   const [plan] = await db.select().from(fiscalYearPlans)
     .where(and(eq(fiscalYearPlans.fiscalYear, fiscalYear), eq(fiscalYearPlans.active, true)));
@@ -136,7 +140,7 @@ export async function createCheckoutSession(
 
   const customerId = await getOrCreateStripeCustomer(userId);
 
-  const session = await requireStripe().checkout.sessions.create({
+  const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: customerId,
     mode: "payment",
     line_items: [
@@ -149,18 +153,30 @@ export async function createCheckoutSession(
       accountId,
       userId,
       fiscalYear,
+      discountCodeId: options?.discountCodeId || "",
     },
     payment_intent_data: {
       metadata: {
         accountId,
         userId,
         fiscalYear,
+        discountCodeId: options?.discountCodeId || "",
       },
       description: `Missouri Form 4923-H Tax Refund - Fiscal Year ${fiscalYear}`,
     },
     success_url: successUrl,
     cancel_url: cancelUrl,
-  });
+  };
+
+  // Apply Stripe promotion code if available
+  if (options?.stripePromotionCodeId) {
+    sessionParams.discounts = [{ promotion_code: options.stripePromotionCodeId }];
+  } else {
+    // Allow user to enter promotion codes if no pre-applied discount
+    sessionParams.allow_promotion_codes = true;
+  }
+
+  const session = await requireStripe().checkout.sessions.create(sessionParams);
 
   return session.url || "";
 }
@@ -182,9 +198,9 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const { accountId, fiscalYear, userId } = session.metadata || {};
+      const { accountId, fiscalYear, userId, discountCodeId } = session.metadata || {};
       
-      console.log(`[Stripe Webhook] checkout.session.completed - accountId: ${accountId}, fiscalYear: ${fiscalYear}`);
+      console.log(`[Stripe Webhook] checkout.session.completed - accountId: ${accountId}, fiscalYear: ${fiscalYear}, discountCodeId: ${discountCodeId}`);
 
       if (accountId && fiscalYear) {
         const existingSub = await db.select().from(accountSubscriptions)
@@ -240,8 +256,26 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             status: "succeeded",
             stripeCustomerId: session.customer as string,
             description: `Missouri Form 4923-H Tax Refund - Fiscal Year ${fiscalYear}`,
+            discountCodeId: discountCodeId || null,
           });
           console.log(`[Stripe Webhook] Created payment ledger entry for ${paymentIntentId}`);
+        }
+        
+        // Record discount code redemption if applicable
+        if (discountCodeId && userId) {
+          try {
+            const amountDiscounted = session.total_details?.amount_discount || 0;
+            await storage.recordDiscountCodeRedemption({
+              discountCodeId,
+              accountId,
+              userId,
+              fiscalYear,
+              amountDiscounted,
+            });
+            console.log(`[Stripe Webhook] Recorded discount code redemption: ${discountCodeId}`);
+          } catch (err) {
+            console.error(`[Stripe Webhook] Failed to record discount code redemption:`, err);
+          }
         }
         
         console.log(`[Stripe Webhook] Subscription activated for account ${accountId}, fiscal year ${fiscalYear}`);
