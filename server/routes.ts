@@ -22,16 +22,16 @@ import express from "express";
 import rateLimit, { type Options, ipKeyGenerator } from "express-rate-limit";
 
 // Rate limiting for authentication endpoints (Item #2 security fix)
-// Using ipKeyGenerator to properly handle IPv6 addresses with /64 subnet normalization
+// Using ipKeyGenerator(req, res) to properly handle IPv6 addresses with /64 subnet normalization
 const authCodeRequestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 3, // 3 requests per 15 minutes per IP/email
   message: { error: "Too many code requests. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
+  keyGenerator: (req, res) => {
     // Rate limit by email if provided, otherwise by IP with proper IPv6 handling
-    return req.body?.email?.toLowerCase() || ipKeyGenerator(req.ip);
+    return req.body?.email?.toLowerCase() || ipKeyGenerator(req, res);
   },
 } as Partial<Options>);
 
@@ -41,8 +41,8 @@ const authCodeVerifyLimiter = rateLimit({
   message: { error: "Too many verification attempts. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.body?.email?.toLowerCase() || ipKeyGenerator(req.ip);
+  keyGenerator: (req, res) => {
+    return req.body?.email?.toLowerCase() || ipKeyGenerator(req, res);
   },
 } as Partial<Options>);
 
@@ -52,8 +52,8 @@ const signupLimiter = rateLimit({
   message: { error: "Too many signup attempts. Please try again in an hour." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return ipKeyGenerator(req.ip);
+  keyGenerator: (req, res) => {
+    return ipKeyGenerator(req, res);
   },
 } as Partial<Options>);
 
@@ -64,8 +64,8 @@ const receiptUploadLimiter = rateLimit({
   message: { error: "Upload limit exceeded. Please try again in a minute." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => {
-    return req.params?.accountId || ipKeyGenerator(req.ip);
+  keyGenerator: (req: any, res: any) => {
+    return req.params?.accountId || ipKeyGenerator(req, res);
   },
 } as Partial<Options>);
 
@@ -75,8 +75,8 @@ const vinLookupLimiter = rateLimit({
   message: { error: "VIN lookup limit exceeded. Please try again in a minute." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => {
-    return req.userId || ipKeyGenerator(req.ip);
+  keyGenerator: (req: any, res: any) => {
+    return req.userId || ipKeyGenerator(req, res);
   },
 } as Partial<Options>);
 

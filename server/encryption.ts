@@ -66,8 +66,8 @@ export function decrypt(ciphertext: string): string {
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     
     return decrypted.toString("utf8");
-  } catch (error) {
-    console.error("Decryption error:", error);
+  } catch {
+    // Silently return original value if decryption fails (e.g., unencrypted legacy data)
     return ciphertext;
   }
 }
