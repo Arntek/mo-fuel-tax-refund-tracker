@@ -14,8 +14,8 @@ interface ProcessingOptions {
 }
 
 const DEFAULT_OPTIONS: Required<ProcessingOptions> = {
-  maxDimension: 1024,
-  quality: 80,
+  maxDimension: 1280,
+  quality: 85,
   grayscale: true,
 };
 
