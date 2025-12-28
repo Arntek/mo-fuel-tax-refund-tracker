@@ -2,11 +2,6 @@ import { Client } from "@replit/object-storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import {
-  ObjectAclPolicy,
-  ObjectPermission,
-  canAccessObject,
-  getObjectAclPolicy,
-  setObjectAclPolicy,
   getObjectMetadata,
   setObjectMetadata,
   deleteObjectMetadata,
@@ -70,9 +65,6 @@ export class ObjectStorageService {
         throw new ObjectNotFoundError();
       }
 
-      const aclPolicy = await getObjectAclPolicy(objectPath);
-      const isPublic = aclPolicy?.visibility === "public";
-      
       // Get stored content type from metadata
       const metadata = await getObjectMetadata(objectPath);
       const contentType = metadata?.contentType || "application/octet-stream";
@@ -80,9 +72,10 @@ export class ObjectStorageService {
       // Download as buffer using stream
       const buffer = await this.downloadObjectAsBytes(objectPath);
       
+      // All objects are private - access is controlled at the route level
       res.set({
         "Content-Type": contentType,
-        "Cache-Control": `${isPublic ? "public" : "private"}, max-age=${cacheTtlSec}`,
+        "Cache-Control": `private, max-age=${cacheTtlSec}`,
         "Content-Length": buffer.length.toString(),
       });
 
@@ -144,29 +137,5 @@ export class ObjectStorageService {
     }
     
     return rawPath;
-  }
-
-  async trySetObjectEntityAclPolicy(
-    rawPath: string,
-    aclPolicy: ObjectAclPolicy
-  ): Promise<string> {
-    await setObjectAclPolicy(rawPath, aclPolicy);
-    return this.normalizeObjectPath(rawPath);
-  }
-
-  async canAccessObjectEntity({
-    userId,
-    objectPath,
-    requestedPermission,
-  }: {
-    userId?: string;
-    objectPath: string;
-    requestedPermission?: ObjectPermission;
-  }): Promise<boolean> {
-    return canAccessObject({
-      userId,
-      objectPath,
-      requestedPermission: requestedPermission ?? ObjectPermission.READ,
-    });
   }
 }

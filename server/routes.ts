@@ -963,14 +963,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.accountId
       );
 
-      // Set ACL policy for the uploaded object
-      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        objectPath,
-        {
-          owner: req.userId,
-          visibility: "private",
-        }
-      );
+      // Get the normalized path for serving the image
+      const normalizedPath = objectStorageService.normalizeObjectPath(objectPath);
 
       const fullImageUrl = `${req.protocol}://${req.get('host')}${normalizedPath}`;
 
