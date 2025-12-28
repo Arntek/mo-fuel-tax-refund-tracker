@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ReceiptTable } from "@/components/receipt-table";
 import { FiscalYearSummary } from "@/components/fiscal-year-summary";
 import { DeadlineBanner } from "@/components/deadline-banner";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Helmet } from "react-helmet";
+import { useFiscalYearSelection } from "@/hooks/use-fiscal-year-selection";
 
 type Receipt = any;
 type Account = any;
@@ -49,24 +50,15 @@ export default function Receipts() {
     return Array.from(new Set(receipts.map((r: Receipt) => r.fiscalYear))).sort().reverse();
   }, [receipts]);
   
-  const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("");
+  // Use shared fiscal year selection hook - remembers selection per account
+  const { selectedFiscalYear, setSelectedFiscalYear, currentFiscalYear } = useFiscalYearSelection(accountId);
+  
+  // Determine effective filter - "all" shows everything, otherwise filter by year
+  const effectiveFiscalYear = selectedFiscalYear === "all" ? null : selectedFiscalYear;
 
-  // Update selected fiscal year when fiscal years change
-  useEffect(() => {
-    if (allFiscalYears.length > 0) {
-      // If current selection is not in the list, reset to the first (most recent) year
-      if (!allFiscalYears.includes(selectedFiscalYear)) {
-        setSelectedFiscalYear(allFiscalYears[0]);
-      }
-    } else if (selectedFiscalYear) {
-      // No receipts, clear selection
-      setSelectedFiscalYear("");
-    }
-  }, [allFiscalYears, selectedFiscalYear]);
-
-  // Filter receipts by selected fiscal year
-  const filteredReceipts = selectedFiscalYear 
-    ? receipts.filter((r: Receipt) => r.fiscalYear === selectedFiscalYear)
+  // Filter receipts by selected fiscal year (null = show all)
+  const filteredReceipts = effectiveFiscalYear 
+    ? receipts.filter((r: Receipt) => r.fiscalYear === effectiveFiscalYear)
     : receipts;
 
   // Separate eligible (Missouri) and ineligible (other states) receipts
@@ -130,37 +122,41 @@ export default function Receipts() {
         {/* Fiscal Year Filter */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h2 className="text-2xl font-semibold">Receipts</h2>
-          {allFiscalYears.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="fiscal-year-select" className="text-sm text-muted-foreground">
-                Fiscal Year:
-              </Label>
-              <Select value={selectedFiscalYear} onValueChange={setSelectedFiscalYear}>
-                <SelectTrigger id="fiscal-year-select" data-testid="select-fiscal-year" className="w-40">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allFiscalYears.map((year: string) => (
+          <div className="flex items-center gap-2">
+            <Label htmlFor="fiscal-year-select" className="text-sm text-muted-foreground">
+              Fiscal Year:
+            </Label>
+            <Select value={selectedFiscalYear} onValueChange={setSelectedFiscalYear}>
+              <SelectTrigger id="fiscal-year-select" data-testid="select-fiscal-year" className="w-40">
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={currentFiscalYear}>
+                  FY {currentFiscalYear} (Current)
+                </SelectItem>
+                {allFiscalYears
+                  .filter((year: string) => year !== currentFiscalYear)
+                  .map((year: string) => (
                     <SelectItem key={year} value={year}>
                       FY {year}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                <SelectItem value="all">All Fiscal Years</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Tax Refund Summary - Only for eligible MO receipts */}
-        {selectedFiscalYear && refundTotals[selectedFiscalYear] !== undefined && eligibleReceipts.length > 0 && (
+        {/* Tax Refund Summary - Only for eligible MO receipts when viewing a specific year */}
+        {effectiveFiscalYear && refundTotals[effectiveFiscalYear] !== undefined && eligibleReceipts.length > 0 && (
           <Card data-testid="card-tax-refund-summary">
             <CardHeader>
               <CardTitle>Tax Refund Summary</CardTitle>
-              <CardDescription>Total refund for FY {selectedFiscalYear} (Missouri purchases only)</CardDescription>
+              <CardDescription>Total refund for FY {effectiveFiscalYear} (Missouri purchases only)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-primary" data-testid="text-refund-amount">
-                ${parseFloat(refundTotals[selectedFiscalYear].toString()).toFixed(2)}
+                ${parseFloat(refundTotals[effectiveFiscalYear].toString()).toFixed(2)}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
                 Based on {eligibleReceipts.length} eligible receipt{eligibleReceipts.length !== 1 ? 's' : ''}
@@ -169,8 +165,10 @@ export default function Receipts() {
           </Card>
         )}
 
-        {/* Summary Cards - Only for eligible receipts */}
-        <FiscalYearSummary receipts={eligibleReceipts} fiscalYear={selectedFiscalYear} />
+        {/* Summary Cards - Only for eligible receipts when viewing a specific year */}
+        {effectiveFiscalYear && (
+          <FiscalYearSummary receipts={eligibleReceipts} fiscalYear={effectiveFiscalYear} />
+        )}
 
         {/* Eligible Receipts (Missouri) */}
         <div className="space-y-4">
@@ -186,7 +184,7 @@ export default function Receipts() {
             <Card>
               <CardContent className="py-8 text-center">
                 <p className="text-muted-foreground">
-                  No eligible Missouri receipts found{selectedFiscalYear ? ` for fiscal year ${selectedFiscalYear}` : ""}.
+                  No eligible Missouri receipts found{effectiveFiscalYear ? ` for fiscal year ${effectiveFiscalYear}` : ""}.
                 </p>
                 <Button asChild className="mt-4" data-testid="button-upload-receipt">
                   <Link href={`/upload/${accountId}`}>

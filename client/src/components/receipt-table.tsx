@@ -32,7 +32,7 @@ type SortField = "date" | "stationName" | "gallons" | "totalAmount";
 type SortDirection = "asc" | "desc";
 
 const ITEMS_PER_PAGE_KEY = "receipts_items_per_page";
-const DEFAULT_ITEMS_PER_PAGE = 10;
+const DEFAULT_ITEMS_PER_PAGE = 25;
 
 export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
   const [sortField, setSortField] = useState<SortField>("date");
@@ -382,9 +382,9 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="10" data-testid="option-10">10</SelectItem>
                   <SelectItem value="25" data-testid="option-25">25</SelectItem>
                   <SelectItem value="50" data-testid="option-50">50</SelectItem>
+                  <SelectItem value="100" data-testid="option-100">100</SelectItem>
                 </SelectContent>
               </Select>
               <span className="text-sm text-muted-foreground">

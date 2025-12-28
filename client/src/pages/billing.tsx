@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -6,11 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Calendar, Loader2, CheckCircle, AlertTriangle, FileText, Receipt, Plus, CreditCard } from "lucide-react";
 import type { Account, FiscalYearPlan } from "@shared/schema";
 import { Helmet } from "react-helmet";
+import { useFiscalYearSelection } from "@/hooks/use-fiscal-year-selection";
 
 type SubscriptionStatus = {
   status: "trial" | "active" | "expired" | "cancelled";
@@ -63,24 +66,29 @@ export default function Billing() {
     enabled: isAdminOrOwner,
   });
 
-  // Fetch subscription status for each plan
-  const subscriptionQueries = useQueries({
-    queries: plans.map((plan) => ({
-      queryKey: ["/api/accounts", accountId, "subscription", plan.fiscalYear],
-      queryFn: async () => {
-        const response = await fetch(`/api/accounts/${accountId}/subscription?fiscalYear=${plan.fiscalYear}`);
-        if (!response.ok) throw new Error("Failed to fetch subscription status");
-        return response.json() as Promise<SubscriptionStatus>;
-      },
-      enabled: isAdminOrOwner && plans.length > 0,
-    })),
-  });
+  // Use shared fiscal year selection hook
+  const { selectedFiscalYear: rawSelectedFiscalYear, setSelectedFiscalYear, currentFiscalYear } = useFiscalYearSelection(accountId || "");
+  
+  const activePlans = plans.filter(p => p.active);
+  
+  // Billing page requires a specific fiscal year, not "all"
+  // If "all" is selected or the value is invalid, default to current fiscal year or first active plan
+  const selectedFiscalYear = (rawSelectedFiscalYear && rawSelectedFiscalYear !== "all" && activePlans.some(p => p.fiscalYear === rawSelectedFiscalYear))
+    ? rawSelectedFiscalYear
+    : (activePlans.find(p => p.fiscalYear === currentFiscalYear)?.fiscalYear || activePlans[0]?.fiscalYear || currentFiscalYear);
 
-  const subscriptionStatusMap = new Map<string, SubscriptionStatus>();
-  plans.forEach((plan, index) => {
-    if (subscriptionQueries[index]?.data) {
-      subscriptionStatusMap.set(plan.fiscalYear, subscriptionQueries[index].data!);
-    }
+  // Find the selected plan
+  const selectedPlan = plans.find(p => p.fiscalYear === selectedFiscalYear && p.active);
+
+  // Fetch subscription status for the selected fiscal year only
+  const { data: subscriptionStatus, isLoading: subscriptionLoading } = useQuery<SubscriptionStatus>({
+    queryKey: ["/api/accounts", accountId, "subscription", selectedFiscalYear],
+    queryFn: async () => {
+      const response = await fetch(`/api/accounts/${accountId}/subscription?fiscalYear=${selectedFiscalYear}`);
+      if (!response.ok) throw new Error("Failed to fetch subscription status");
+      return response.json() as Promise<SubscriptionStatus>;
+    },
+    enabled: isAdminOrOwner && !!selectedFiscalYear,
   });
 
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ payments: Payment[] }>({
@@ -191,7 +199,7 @@ export default function Billing() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : plans.length === 0 ? (
+            ) : activePlans.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No fiscal year plans available yet</p>
@@ -199,27 +207,46 @@ export default function Billing() {
               </div>
             ) : (
               <div className="space-y-4">
-                {plans.filter(p => p.active).map((plan) => {
-                  const subscriptionStatus = subscriptionStatusMap.get(plan.fiscalYear);
-                  const isLoading = subscriptionQueries.find((q, i) => plans[i]?.fiscalYear === plan.fiscalYear)?.isLoading;
-                  const packSize = plan.packSize || 52;
-                  const packPrice = ((plan.packPriceInCents || 500) / 100).toFixed(2);
+                {/* Fiscal Year Selector */}
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="billing-fiscal-year" className="text-sm text-muted-foreground">
+                    Fiscal Year:
+                  </Label>
+                  <Select value={selectedFiscalYear} onValueChange={setSelectedFiscalYear}>
+                    <SelectTrigger id="billing-fiscal-year" data-testid="select-billing-fiscal-year" className="w-48">
+                      <SelectValue placeholder="Select fiscal year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activePlans.map((plan) => (
+                        <SelectItem key={plan.fiscalYear} value={plan.fiscalYear}>
+                          FY {plan.fiscalYear} {plan.fiscalYear === currentFiscalYear ? "(Current)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  return (
-                    <FiscalYearPlanCard
-                      key={plan.id}
-                      plan={plan}
-                      subscriptionStatus={subscriptionStatus}
-                      isLoading={isLoading}
-                      packSize={packSize}
-                      packPrice={packPrice}
-                      onSubscribe={() => createCheckoutMutation.mutate(plan.fiscalYear)}
-                      onPurchasePack={() => purchaseReceiptPackMutation.mutate(plan.fiscalYear)}
-                      isSubscribing={subscribingFiscalYear === plan.fiscalYear}
-                      isPurchasingPack={purchasingPackFiscalYear === plan.fiscalYear}
-                    />
-                  );
-                })}
+                {/* Selected Plan Card */}
+                {selectedPlan && (
+                  <FiscalYearPlanCard
+                    plan={selectedPlan}
+                    subscriptionStatus={subscriptionStatus}
+                    isLoading={subscriptionLoading}
+                    packSize={selectedPlan.packSize || 52}
+                    packPrice={((selectedPlan.packPriceInCents || 500) / 100).toFixed(2)}
+                    onSubscribe={() => createCheckoutMutation.mutate(selectedPlan.fiscalYear)}
+                    onPurchasePack={() => purchaseReceiptPackMutation.mutate(selectedPlan.fiscalYear)}
+                    isSubscribing={subscribingFiscalYear === selectedPlan.fiscalYear}
+                    isPurchasingPack={purchasingPackFiscalYear === selectedPlan.fiscalYear}
+                  />
+                )}
+
+                {!selectedPlan && selectedFiscalYear && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No plan available for {selectedFiscalYear}</p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
