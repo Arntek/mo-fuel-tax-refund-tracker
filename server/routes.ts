@@ -433,6 +433,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/accounts", authMiddleware, async (req: any, res) => {
+    try {
+      const validated = insertAccountSchema.parse({
+        ...req.body,
+        ownerId: req.userId,
+      });
+      
+      const account = await storage.createAccount(validated);
+      
+      // Automatically add the creator as an owner member
+      await storage.addAccountMember({
+        accountId: account.id,
+        userId: req.userId,
+        role: "owner",
+      });
+      
+      res.status(201).json(account);
+    } catch (error) {
+      console.error("Error creating account:", error);
+      res.status(500).json({ error: "Failed to create account" });
+    }
+  });
+
   app.get("/api/accounts/:accountId", authMiddleware, accountAccessMiddleware, async (req: any, res) => {
     try {
       const account = await storage.getAccountById(req.accountId);
