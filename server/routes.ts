@@ -242,8 +242,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.getUserByEmail(email);
       
+      // If user doesn't exist, return success but indicate they need to sign up
+      // This is safe to reveal AFTER they've proven email ownership via code
       if (!user) {
-        return res.status(404).json({ error: "User not found. Please sign up first." });
+        return res.json({ success: true, userExists: false });
       }
       
       const sessionId = await createSession(user.id);
@@ -256,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         path: "/",
       });
       
-      res.json({ success: true, user });
+      res.json({ success: true, userExists: true, user });
     } catch (error) {
       console.error("Error verifying code:", error);
       res.status(500).json({ error: "Failed to verify code" });

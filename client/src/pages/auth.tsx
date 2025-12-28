@@ -13,12 +13,13 @@ import { Separator } from "@/components/ui/separator";
 
 export default function Auth() {
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<"landing" | "email" | "choose" | "code" | "signup">("landing");
+  const [step, setStep] = useState<"landing" | "email" | "code" | "signup">("landing");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [codeValidated, setCodeValidated] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function Auth() {
         body: JSON.stringify({ email }),
       });
 
-      setStep("choose");
+      setStep("code");
       toast({
         title: "Code sent",
         description: "Check your email for the verification code",
@@ -64,17 +65,27 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      await apiRequest("/api/auth/verify-code", {
+      const response = await apiRequest<{ success: boolean; userExists: boolean; user?: any }>("/api/auth/verify-code", {
         method: "POST",
         body: JSON.stringify({ email, code }),
       });
 
-      toast({
-        title: "Success",
-        description: "You're now logged in",
-      });
-
-      setLocation("/accounts");
+      if (response.userExists) {
+        // User exists and is now logged in
+        toast({
+          title: "Success",
+          description: "You're now logged in",
+        });
+        setLocation("/accounts");
+      } else {
+        // Code is valid but user doesn't exist - show signup form
+        setCodeValidated(true);
+        setStep("signup");
+        toast({
+          title: "Almost there!",
+          description: "Please enter your name to complete signup",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -426,24 +437,11 @@ export default function Auth() {
           <CardHeader>
             <CardTitle>Create Your Profile</CardTitle>
             <CardDescription>
-              Enter the verification code sent to {email}
+              Email verified! Enter your name to complete signup.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignup} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="signup-code">Verification Code</Label>
-                <Input
-                  id="signup-code"
-                  type="text"
-                  placeholder="123456"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  maxLength={6}
-                  required
-                  data-testid="input-signup-code"
-                />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="first-name">First Name</Label>
                 <Input
@@ -472,7 +470,7 @@ export default function Auth() {
                 After signing up, you can create a new account or join an existing one.
               </p>
               <Button type="submit" className="w-full" disabled={loading} data-testid="button-create-account">
-                {loading ? "Creating..." : "Sign Up"}
+                {loading ? "Creating..." : "Complete Signup"}
               </Button>
               <Button
                 type="button"
@@ -481,7 +479,7 @@ export default function Auth() {
                 onClick={() => setStep("email")}
                 data-testid="button-back-to-email-signup"
               >
-                Back
+                Start Over
               </Button>
             </form>
           </CardContent>
