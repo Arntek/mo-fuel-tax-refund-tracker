@@ -317,7 +317,11 @@ export default function Vehicles() {
             {activeVehicles.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
-                  No active vehicles yet
+                  {isAdminOrOwner ? (
+                    "No active vehicles yet. Add a vehicle to start tracking receipts."
+                  ) : (
+                    "No vehicles have been added yet. Ask an account admin to add vehicles."
+                  )}
                 </CardContent>
               </Card>
             ) : (
