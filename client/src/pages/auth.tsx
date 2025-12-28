@@ -13,13 +13,12 @@ import { Separator } from "@/components/ui/separator";
 
 export default function Auth() {
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<"landing" | "email" | "code" | "signup">("landing");
+  const [step, setStep] = useState<"landing" | "email" | "choose" | "code" | "signup">("landing");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [userExists, setUserExists] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -39,26 +38,16 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const response = await apiRequest<{ userExists: boolean; message: string }>("/api/auth/request-code", {
+      await apiRequest<{ message: string }>("/api/auth/request-code", {
         method: "POST",
         body: JSON.stringify({ email }),
       });
 
-      setUserExists(response.userExists);
-      
-      if (response.userExists) {
-        setStep("code");
-        toast({
-          title: "Code sent",
-          description: "Check your email for the verification code (or check server logs in development)",
-        });
-      } else {
-        setStep("signup");
-        toast({
-          title: "Email not registered",
-          description: "Please create an account first",
-        });
-      }
+      setStep("choose");
+      toast({
+        title: "Code sent",
+        description: "Check your email for the verification code",
+      });
     } catch (error) {
       toast({
         title: "Error",
