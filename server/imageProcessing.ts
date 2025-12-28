@@ -49,8 +49,10 @@ export async function processReceiptImage(
 
   // Build the sharp pipeline
   let pipeline = sharp(inputBuffer)
-    // Auto-rotate based on EXIF orientation, then remove EXIF data
-    .rotate();
+    // Auto-rotate based on EXIF orientation
+    .rotate()
+    // Set orientation metadata to 1 (normal) after rotation so browsers display correctly
+    .withMetadata({ orientation: 1 });
 
   // Only resize if image is larger than maxDimension
   if (needsResize) {
