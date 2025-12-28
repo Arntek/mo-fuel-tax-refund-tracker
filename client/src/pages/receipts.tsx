@@ -118,7 +118,7 @@ export default function Receipts() {
       </Helmet>
       <DeadlineBanner />
 
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
+      <main className="flex-1 px-4 py-6 pb-16 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-6">
         {/* Fiscal Year Filter */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h2 className="text-2xl font-semibold">Receipts</h2>
