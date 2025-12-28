@@ -13,24 +13,32 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Account, User } from "@shared/schema";
 import { Helmet } from "react-helmet";
 
-// Helper functions for obfuscation
+// Helper functions for formatting SSN and EIN
+function formatSSN(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 9);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
+function formatEIN(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 9);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+}
+
 function obfuscateSSN(ssn: string): string {
   if (!ssn) return "";
   const clean = ssn.replace(/\D/g, "");
   if (clean.length < 4) return ssn;
-  return "•••-••-" + clean.slice(-4);
+  return "XXX-XX-" + clean.slice(-4);
 }
 
 function obfuscateEIN(ein: string): string {
   if (!ein) return "";
   const clean = ein.replace(/\D/g, "");
   if (clean.length < 4) return ein;
-  return "••-" + clean.slice(-4);
-}
-
-function deobfuscate(value: string): string {
-  if (!value || !value.includes("•")) return value;
-  return "";
+  return "XX-XXX" + clean.slice(-4);
 }
 
 export default function Settings() {
@@ -68,12 +76,6 @@ export default function Settings() {
     phoneNumber: "",
   });
 
-  const [displayValues, setDisplayValues] = useState({
-    ssn: "",
-    fein: "",
-    spouseSsn: "",
-  });
-
   // Sync account data when it loads
   useEffect(() => {
     if (account) {
@@ -96,11 +98,6 @@ export default function Settings() {
         zipCode: account.zipCode || "",
         emailAddress: account.emailAddress || currentUser?.email || "",
         phoneNumber: account.phoneNumber || "",
-      });
-      setDisplayValues({
-        ssn: obfuscateSSN(account.ssn || ""),
-        fein: obfuscateEIN(account.fein || ""),
-        spouseSsn: obfuscateSSN(account.spouseSsn || ""),
       });
     }
   }, [account, currentUser]);
@@ -129,16 +126,15 @@ export default function Settings() {
   });
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Update display values for sensitive fields
-    if (field === "ssn") {
-      setDisplayValues(prev => ({ ...prev, ssn: obfuscateSSN(value) }));
+    // Apply formatting for SSN and EIN fields
+    let formattedValue = value;
+    if (field === "ssn" || field === "spouseSsn") {
+      formattedValue = formatSSN(value);
     } else if (field === "fein") {
-      setDisplayValues(prev => ({ ...prev, fein: obfuscateEIN(value) }));
-    } else if (field === "spouseSsn") {
-      setDisplayValues(prev => ({ ...prev, spouseSsn: obfuscateSSN(value) }));
+      formattedValue = formatEIN(value);
     }
+    
+    setFormData(prev => ({ ...prev, [field]: formattedValue }));
   };
 
 
@@ -248,13 +244,10 @@ export default function Settings() {
                           id="fein"
                           value={formData.fein}
                           onChange={(e) => handleChange("fein", e.target.value)}
-                          placeholder="••-XXXX"
-                          maxLength={9}
+                          placeholder="XX-XXXXXXX"
+                          maxLength={10}
                           data-testid="input-fein"
                         />
-                        {formData.fein && displayValues.fein && (
-                          <p className="text-xs text-muted-foreground">{displayValues.fein}</p>
-                        )}
                       </div>
                     </>
                   )}
@@ -299,13 +292,10 @@ export default function Settings() {
                         id="ssn"
                         value={formData.ssn}
                         onChange={(e) => handleChange("ssn", e.target.value)}
-                        placeholder="•••-••-XXXX"
+                        placeholder="XXX-XX-XXXX"
                         maxLength={11}
                         data-testid="input-ssn"
                       />
-                      {formData.ssn && displayValues.ssn && (
-                        <p className="text-xs text-muted-foreground">{displayValues.ssn}</p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -352,13 +342,10 @@ export default function Settings() {
                       id="spouse-ssn"
                       value={formData.spouseSsn}
                       onChange={(e) => handleChange("spouseSsn", e.target.value)}
-                      placeholder="•••-••-XXXX"
+                      placeholder="XXX-XX-XXXX"
                       maxLength={11}
                       data-testid="input-spouse-ssn"
                     />
-                    {formData.spouseSsn && displayValues.spouseSsn && (
-                      <p className="text-xs text-muted-foreground">{displayValues.spouseSsn}</p>
-                    )}
                   </div>
                 </div>
 

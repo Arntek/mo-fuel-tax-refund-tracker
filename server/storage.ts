@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { eq, and, desc, lte, gte, or, isNull, sql, inArray } from "drizzle-orm";
 import * as schema from "@shared/schema";
+import { encryptSSN, decryptSSN, encryptVIN, decryptVIN, formatSSN, formatEIN } from "./encryption";
 import {
   type User,
   type InsertUser,
@@ -192,22 +193,65 @@ export class DbStorage implements IStorage {
   // Account operations
   async getAccountById(id: string): Promise<Account | undefined> {
     const [account] = await db.select().from(schema.accounts).where(eq(schema.accounts.id, id)).limit(1);
-    return account;
+    if (!account) return undefined;
+    
+    // Decrypt sensitive fields for display
+    return {
+      ...account,
+      ssn: account.ssn ? formatSSN(decryptSSN(account.ssn)) : null,
+      spouseSsn: account.spouseSsn ? formatSSN(decryptSSN(account.spouseSsn)) : null,
+      fein: account.fein ? formatEIN(decryptSSN(account.fein)) : null,
+    };
   }
 
   async createAccount(insertAccount: InsertAccount): Promise<Account> {
-    const [account] = await db.insert(schema.accounts).values(insertAccount).returning();
+    // Encrypt sensitive fields before storing
+    const encryptedData = {
+      ...insertAccount,
+      ssn: insertAccount.ssn ? encryptSSN(insertAccount.ssn) : null,
+      spouseSsn: insertAccount.spouseSsn ? encryptSSN(insertAccount.spouseSsn) : null,
+      fein: insertAccount.fein ? encryptSSN(insertAccount.fein) : null,
+    };
+    
+    const [account] = await db.insert(schema.accounts).values(encryptedData).returning();
     await db.insert(schema.accountMembers).values({
       accountId: account.id,
       userId: insertAccount.ownerId,
       role: "owner",
     });
-    return account;
+    
+    // Return with decrypted values for display
+    return {
+      ...account,
+      ssn: insertAccount.ssn ? formatSSN(insertAccount.ssn.replace(/\D/g, "")) : null,
+      spouseSsn: insertAccount.spouseSsn ? formatSSN(insertAccount.spouseSsn.replace(/\D/g, "")) : null,
+      fein: insertAccount.fein || null,
+    };
   }
 
   async updateAccount(id: string, updates: Partial<InsertAccount>): Promise<Account | undefined> {
-    const [updated] = await db.update(schema.accounts).set(updates).where(eq(schema.accounts.id, id)).returning();
-    return updated;
+    // Encrypt sensitive fields if they're being updated
+    const encryptedUpdates: Partial<InsertAccount> = { ...updates };
+    if (updates.ssn !== undefined) {
+      encryptedUpdates.ssn = updates.ssn ? encryptSSN(updates.ssn) : null;
+    }
+    if (updates.spouseSsn !== undefined) {
+      encryptedUpdates.spouseSsn = updates.spouseSsn ? encryptSSN(updates.spouseSsn) : null;
+    }
+    if (updates.fein !== undefined) {
+      encryptedUpdates.fein = updates.fein ? encryptSSN(updates.fein) : null;
+    }
+    
+    const [updated] = await db.update(schema.accounts).set(encryptedUpdates).where(eq(schema.accounts.id, id)).returning();
+    if (!updated) return undefined;
+    
+    // Return with decrypted values
+    return {
+      ...updated,
+      ssn: updated.ssn ? formatSSN(decryptSSN(updated.ssn)) : null,
+      spouseSsn: updated.spouseSsn ? formatSSN(decryptSSN(updated.spouseSsn)) : null,
+      fein: updated.fein ? formatEIN(decryptSSN(updated.fein)) : null,
+    };
   }
 
   async deleteAccount(id: string): Promise<boolean> {
@@ -229,8 +273,14 @@ export class DbStorage implements IStorage {
           .select()
           .from(schema.accountMembers)
           .where(and(eq(schema.accountMembers.accountId, row.accounts.id), eq(schema.accountMembers.active, true)));
+        
+        // Decrypt sensitive fields
+        const account = row.accounts;
         return {
-          ...row.accounts,
+          ...account,
+          ssn: account.ssn ? formatSSN(decryptSSN(account.ssn)) : null,
+          spouseSsn: account.spouseSsn ? formatSSN(decryptSSN(account.spouseSsn)) : null,
+          fein: account.fein ? formatEIN(decryptSSN(account.fein)) : null,
           role: row.account_members.role,
           memberCount: members.length,
         };
@@ -324,24 +374,54 @@ export class DbStorage implements IStorage {
     return member?.role;
   }
 
+  // Helper to decrypt vehicle VIN
+  private decryptVehicleVIN(vehicle: Vehicle): Vehicle {
+    return {
+      ...vehicle,
+      vin: vehicle.vin ? decryptVIN(vehicle.vin) : null,
+    };
+  }
+
   // Vehicle operations
   async getAccountVehicles(accountId: string): Promise<Vehicle[]> {
-    return db.select().from(schema.vehicles).where(eq(schema.vehicles.accountId, accountId));
+    const vehicles = await db.select().from(schema.vehicles).where(eq(schema.vehicles.accountId, accountId));
+    return vehicles.map(v => this.decryptVehicleVIN(v));
   }
 
   async getVehicleById(id: string): Promise<Vehicle | undefined> {
     const [vehicle] = await db.select().from(schema.vehicles).where(eq(schema.vehicles.id, id)).limit(1);
-    return vehicle;
+    return vehicle ? this.decryptVehicleVIN(vehicle) : undefined;
   }
 
   async createVehicle(insertVehicle: InsertVehicle): Promise<Vehicle> {
-    const [vehicle] = await db.insert(schema.vehicles).values(insertVehicle).returning();
-    return vehicle;
+    // Encrypt VIN before storing
+    let encryptedData: any = { ...insertVehicle };
+    if (insertVehicle.vin) {
+      const { encrypted, searchHash } = encryptVIN(insertVehicle.vin);
+      encryptedData.vin = encrypted;
+      encryptedData.vinHash = searchHash;
+    }
+    
+    const [vehicle] = await db.insert(schema.vehicles).values(encryptedData).returning();
+    return this.decryptVehicleVIN(vehicle);
   }
 
   async updateVehicle(id: string, updates: Partial<InsertVehicle>): Promise<Vehicle | undefined> {
-    const [updated] = await db.update(schema.vehicles).set(updates).where(eq(schema.vehicles.id, id)).returning();
-    return updated;
+    // Encrypt VIN if being updated
+    let encryptedUpdates: any = { ...updates };
+    if (updates.vin !== undefined) {
+      if (updates.vin) {
+        const { encrypted, searchHash } = encryptVIN(updates.vin);
+        encryptedUpdates.vin = encrypted;
+        encryptedUpdates.vinHash = searchHash;
+      } else {
+        encryptedUpdates.vin = null;
+        encryptedUpdates.vinHash = null;
+      }
+    }
+    
+    const [updated] = await db.update(schema.vehicles).set(encryptedUpdates).where(eq(schema.vehicles.id, id)).returning();
+    return updated ? this.decryptVehicleVIN(updated) : undefined;
   }
 
   async deleteVehicle(id: string): Promise<boolean> {
@@ -365,7 +445,7 @@ export class DbStorage implements IStorage {
         eq(schema.vehicles.accountId, accountId)
       ));
     
-    return assignments.map(a => a.vehicle);
+    return assignments.map(a => this.decryptVehicleVIN(a.vehicle));
   }
 
   async deactivateVehicle(id: string): Promise<Vehicle | undefined> {
@@ -374,7 +454,7 @@ export class DbStorage implements IStorage {
       .set({ active: false })
       .where(eq(schema.vehicles.id, id))
       .returning();
-    return deactivated;
+    return deactivated ? this.decryptVehicleVIN(deactivated) : undefined;
   }
 
   async hasVehicleReceipts(vehicleId: string): Promise<boolean> {

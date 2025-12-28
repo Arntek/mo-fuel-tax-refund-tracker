@@ -43,15 +43,15 @@ export const accounts = pgTable("accounts", {
   ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   totalReceiptsUploaded: integer("total_receipts_uploaded").notNull().default(0),
   businessName: varchar("business_name", { length: 255 }),
-  fein: varchar("fein", { length: 20 }),
+  fein: varchar("fein", { length: 255 }),
   firstName: varchar("first_name", { length: 255 }),
   middleInitial: varchar("middle_initial", { length: 10 }),
   lastName: varchar("last_name", { length: 255 }),
-  ssn: varchar("ssn", { length: 20 }),
+  ssn: varchar("ssn", { length: 255 }),
   spouseFirstName: varchar("spouse_first_name", { length: 255 }),
   spouseMiddleInitial: varchar("spouse_middle_initial", { length: 10 }),
   spouseLastName: varchar("spouse_last_name", { length: 255 }),
-  spouseSsn: varchar("spouse_ssn", { length: 20 }),
+  spouseSsn: varchar("spouse_ssn", { length: 255 }),
   mailingAddress: text("mailing_address"),
   city: varchar("city", { length: 255 }),
   state: varchar("state", { length: 50 }),
@@ -76,7 +76,8 @@ export const accountMembers = pgTable("account_members", {
 export const vehicles = pgTable("vehicles", {
   id: uuid("id").primaryKey().defaultRandom(),
   accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
-  vin: varchar("vin", { length: 17 }),
+  vin: varchar("vin", { length: 255 }),
+  vinHash: varchar("vin_hash", { length: 255 }),
   nickname: varchar("nickname", { length: 100 }),
   year: integer("year").notNull(),
   make: varchar("make", { length: 100 }).notNull(),
@@ -87,6 +88,7 @@ export const vehicles = pgTable("vehicles", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   accountIdx: index("vehicle_account_idx").on(table.accountId),
+  vinHashIdx: index("vehicle_vin_hash_idx").on(table.vinHash),
 }));
 
 export const vehicleMembers = pgTable("vehicle_members", {

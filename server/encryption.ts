@@ -109,6 +109,13 @@ export function formatSSN(ssn: string | null | undefined): string | null {
   return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5)}`;
 }
 
+export function formatEIN(ein: string | null | undefined): string | null {
+  if (!ein) return null;
+  const cleaned = ein.replace(/\D/g, "");
+  if (cleaned.length !== 9) return null;
+  return `${cleaned.slice(0, 2)}-${cleaned.slice(2)}`;
+}
+
 export function maskSSN(ssn: string | null | undefined): string | null {
   if (!ssn) return null;
   const cleaned = ssn.replace(/\D/g, "");
