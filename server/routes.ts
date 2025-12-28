@@ -465,14 +465,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerId: req.userId,
       });
       
+      // createAccount already adds the owner as a member
       const account = await storage.createAccount(validated);
-      
-      // Automatically add the creator as an owner member
-      await storage.addAccountMember({
-        accountId: account.id,
-        userId: req.userId,
-        role: "owner",
-      });
       
       res.status(201).json(account);
     } catch (error) {
