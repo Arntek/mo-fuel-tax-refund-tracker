@@ -53,6 +53,8 @@ export function UploadZone({ accountId, vehicleId, onViewReceipt }: UploadZonePr
     },
     onSuccess: (receipt: Receipt) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
+      // Also invalidate subscription status to update the receipt counter
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "subscription"] });
       setIsUploading(false);
       setUploadedReceipt(receipt);
       setShowPostUploadDialog(true);

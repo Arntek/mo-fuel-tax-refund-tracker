@@ -66,6 +66,8 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
+      // Also invalidate subscription status to update the receipt counter
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "subscription"] });
       toast({
         title: "Receipt deleted",
         description: "The receipt has been removed successfully",
