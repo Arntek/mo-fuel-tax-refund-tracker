@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { transcribeReceipt } from "./openai";
+import { processReceiptImage, getCompressionStats } from "./imageProcessing";
 import { calculateReceiptTaxRefund, calculateRefundByFiscalYear } from "./taxCalculations";
 import { 
   insertReceiptSchema, 
@@ -852,10 +853,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { vehicleId } = req.body;
 
-      // Upload directly to object storage using Replit SDK, organized by accountId
+      // Process image for optimal OCR and storage
+      // Resize to 1024px max, convert to grayscale JPEG at 80% quality
+      const processed = await processReceiptImage(req.file.buffer);
+      const stats = getCompressionStats(processed.originalSize, processed.processedSize);
+      console.log(`Receipt image processed: ${stats.originalKB}KB → ${stats.processedKB}KB (${stats.reductionPercent}% reduction)`);
+
+      // Upload processed image to object storage using Replit SDK, organized by accountId
       const objectPath = await objectStorageService.uploadObject(
-        req.file.buffer,
-        req.file.mimetype,
+        processed.buffer,
+        processed.mimetype,
         req.accountId
       );
 
@@ -895,7 +902,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(receipt);
 
       // Process AI transcription in background (after response sent)
-      processReceiptInBackground(receipt.id, req.file.buffer, req.file.mimetype);
+      // Use the processed (optimized) image for AI transcription
+      processReceiptInBackground(receipt.id, processed.buffer, processed.mimetype);
     } catch (error) {
       console.error("Error uploading receipt:", error);
       res.status(500).json({ 
