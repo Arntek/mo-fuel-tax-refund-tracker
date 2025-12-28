@@ -1,6 +1,7 @@
 // Blueprint references: javascript_object_storage, javascript_openai_ai_integrations
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { transcribeReceipt } from "./openai";
