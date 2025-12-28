@@ -682,6 +682,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/accounts/:accountId/vehicles/:id", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const id = req.params.id;
+      
+      // IDOR protection: verify vehicle belongs to this account
+      const vehicle = await storage.getVehicleById(id);
+      if (!vehicle || vehicle.accountId !== req.accountId) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      
       const validated = insertVehicleSchema.partial().parse(req.body);
       
       const updated = await storage.updateVehicle(id, validated);
@@ -700,6 +707,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/accounts/:accountId/vehicles/:id", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const id = req.params.id;
+      
+      // IDOR protection: verify vehicle belongs to this account
+      const vehicle = await storage.getVehicleById(id);
+      if (!vehicle || vehicle.accountId !== req.accountId) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
       
       // Check if vehicle has receipts
       const hasReceipts = await storage.hasVehicleReceipts(id);
@@ -731,6 +744,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/accounts/:accountId/vehicles/:vehicleId/members", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const { vehicleId } = req.params;
+      
+      // IDOR protection: verify vehicle belongs to this account
+      const vehicle = await storage.getVehicleById(vehicleId);
+      if (!vehicle || vehicle.accountId !== req.accountId) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      
       const members = await storage.getVehicleMembers(vehicleId);
       res.json(members);
     } catch (error) {
@@ -746,6 +766,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!userId) {
         return res.status(400).json({ error: "User ID is required" });
+      }
+      
+      // IDOR protection: verify vehicle belongs to this account
+      const vehicle = await storage.getVehicleById(vehicleId);
+      if (!vehicle || vehicle.accountId !== req.accountId) {
+        return res.status(404).json({ error: "Vehicle not found" });
       }
       
       // Verify the user is a member of this account
@@ -765,6 +791,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/accounts/:accountId/vehicles/:vehicleId/members/:userId", authMiddleware, accountAccessMiddleware, adminMiddleware, async (req: any, res) => {
     try {
       const { vehicleId, userId } = req.params;
+      
+      // IDOR protection: verify vehicle belongs to this account
+      const vehicle = await storage.getVehicleById(vehicleId);
+      if (!vehicle || vehicle.accountId !== req.accountId) {
+        return res.status(404).json({ error: "Vehicle not found" });
+      }
+      
       const success = await storage.removeVehicleMember(vehicleId, userId);
       
       if (!success) {
