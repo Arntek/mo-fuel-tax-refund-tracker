@@ -19,6 +19,66 @@ import { createAuthCodeForEmail, verifyAuthCode, createSession, getUserFromSessi
 import cookieParser from "cookie-parser";
 import * as stripeService from "./stripe";
 import express from "express";
+import rateLimit, { type Options, ipKeyGenerator } from "express-rate-limit";
+
+// Rate limiting for authentication endpoints (Item #2 security fix)
+// Using ipKeyGenerator to properly handle IPv6 addresses with /64 subnet normalization
+const authCodeRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // 3 requests per 15 minutes per IP/email
+  message: { error: "Too many code requests. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Rate limit by email if provided, otherwise by IP with proper IPv6 handling
+    return req.body?.email?.toLowerCase() || ipKeyGenerator(req.ip);
+  },
+} as Partial<Options>);
+
+const authCodeVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per 15 minutes per email
+  message: { error: "Too many verification attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.body?.email?.toLowerCase() || ipKeyGenerator(req.ip);
+  },
+} as Partial<Options>);
+
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 signups per hour per IP
+  message: { error: "Too many signup attempts. Please try again in an hour." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return ipKeyGenerator(req.ip);
+  },
+} as Partial<Options>);
+
+// Rate limiting for resource-intensive endpoints (Item #12 security fix)
+const receiptUploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 uploads per minute per account
+  message: { error: "Upload limit exceeded. Please try again in a minute." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) => {
+    return req.params?.accountId || ipKeyGenerator(req.ip);
+  },
+} as Partial<Options>);
+
+const vinLookupLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // 20 VIN lookups per minute per user
+  message: { error: "VIN lookup limit exceeded. Please try again in a minute." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) => {
+    return req.userId || ipKeyGenerator(req.ip);
+  },
+} as Partial<Options>);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -136,7 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/request-code", async (req, res) => {
+  app.post("/api/auth/request-code", authCodeRequestLimiter, async (req, res) => {
     try {
       const { email } = req.body;
       
@@ -161,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/verify-code", async (req, res) => {
+  app.post("/api/auth/verify-code", authCodeVerifyLimiter, async (req, res) => {
     try {
       const { email, code } = req.body;
       
@@ -196,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/signup", async (req, res) => {
+  app.post("/api/auth/signup", signupLimiter, async (req, res) => {
     try {
       const { email, firstName, lastName, code } = req.body;
       
@@ -714,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/vin-lookup/:vin", authMiddleware, async (req, res) => {
+  app.get("/api/vin-lookup/:vin", authMiddleware, vinLookupLimiter, async (req, res) => {
     try {
       const { vin } = req.params;
       
@@ -831,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/accounts/:accountId/receipts/upload", authMiddleware, accountAccessMiddleware, upload.single("receipt"), async (req: any, res) => {
+  app.post("/api/accounts/:accountId/receipts/upload", authMiddleware, accountAccessMiddleware, receiptUploadLimiter, upload.single("receipt"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });

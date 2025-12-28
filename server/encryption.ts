@@ -105,15 +105,31 @@ export function decryptSSN(encryptedSSN: string | null | undefined): string | nu
 export function formatSSN(ssn: string | null | undefined): string | null {
   if (!ssn) return null;
   const cleaned = ssn.replace(/\D/g, "");
-  if (cleaned.length !== 9) return null;
-  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5)}`;
+  // Handle already formatted SSN or 9-digit SSN
+  if (cleaned.length === 9) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5)}`;
+  }
+  // Return original if it looks like it's already formatted
+  if (/^\d{3}-\d{2}-\d{4}$/.test(ssn)) {
+    return ssn;
+  }
+  // Return original if not a valid SSN format (legacy unencrypted data)
+  return ssn;
 }
 
 export function formatEIN(ein: string | null | undefined): string | null {
   if (!ein) return null;
   const cleaned = ein.replace(/\D/g, "");
-  if (cleaned.length !== 9) return null;
-  return `${cleaned.slice(0, 2)}-${cleaned.slice(2)}`;
+  // Handle already formatted EIN or 9-digit EIN
+  if (cleaned.length === 9) {
+    return `${cleaned.slice(0, 2)}-${cleaned.slice(2)}`;
+  }
+  // Return original if it looks like it's already formatted
+  if (/^\d{2}-\d{7}$/.test(ein)) {
+    return ein;
+  }
+  // Return original if not a valid EIN format (legacy unencrypted data)
+  return ein;
 }
 
 export function maskSSN(ssn: string | null | undefined): string | null {
