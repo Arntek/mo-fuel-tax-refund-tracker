@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, firstName, lastName, code, accountName, accountType } = req.body;
+      const { email, firstName, lastName, code } = req.body;
       
       if (!email || !firstName || !lastName || !code) {
         return res.status(400).json({ error: "Email, first name, last name, and code required" });
@@ -218,12 +218,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertUserSchema.parse({ email, firstName, lastName });
       const user = await storage.createUser(validated);
       
-      const account = await storage.createAccount({
-        name: accountName || `${firstName} ${lastName}'s Account`,
-        type: accountType || "family",
-        ownerId: user.id,
-      });
-      
       const sessionId = await createSession(user.id);
       
       res.cookie("sessionId", sessionId, {
@@ -232,7 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sameSite: "lax",
       });
       
-      res.json({ success: true, user, account });
+      res.json({ success: true, user });
     } catch (error) {
       console.error("Error signing up:", error);
       res.status(500).json({ error: "Failed to create user" });

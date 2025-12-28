@@ -18,8 +18,6 @@ export default function Auth() {
   const [code, setCode] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [accountType, setAccountType] = useState<"family" | "business">("family");
   const [loading, setLoading] = useState(false);
   const [userExists, setUserExists] = useState(false);
   const { toast } = useToast();
@@ -111,19 +109,17 @@ export default function Auth() {
           firstName,
           lastName,
           code,
-          accountName: accountName || `${firstName} ${lastName}'s Account`,
-          accountType,
         }),
       });
 
       toast({
-        title: "Account created",
-        description: "Welcome! Your account has been created.",
+        title: "Welcome!",
+        description: "Your profile has been created. Now join or create an account.",
       });
 
       setLocation("/accounts");
     } catch (error: any) {
-      const message = error?.message || "Failed to create account";
+      const message = error?.message || "Failed to create profile";
       toast({
         title: "Error",
         description: message,
@@ -439,7 +435,7 @@ export default function Auth() {
         </div>
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Create Your Account</CardTitle>
+            <CardTitle>Create Your Profile</CardTitle>
             <CardDescription>
               Enter the verification code sent to {email}
             </CardDescription>
@@ -483,32 +479,11 @@ export default function Auth() {
                   data-testid="input-last-name"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="account-name">Account Name (Optional)</Label>
-                <Input
-                  id="account-name"
-                  type="text"
-                  placeholder="My Family Account"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  data-testid="input-account-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="account-type">Account Type</Label>
-                <select
-                  id="account-type"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                  value={accountType}
-                  onChange={(e) => setAccountType(e.target.value as "family" | "business")}
-                  data-testid="select-account-type"
-                >
-                  <option value="family">Family</option>
-                  <option value="business">Business</option>
-                </select>
-              </div>
+              <p className="text-sm text-muted-foreground text-center pt-2">
+                After signing up, you can create a new account or join an existing one.
+              </p>
               <Button type="submit" className="w-full" disabled={loading} data-testid="button-create-account">
-                {loading ? "Creating..." : "Create Account"}
+                {loading ? "Creating..." : "Sign Up"}
               </Button>
               <Button
                 type="button"
