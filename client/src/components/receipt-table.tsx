@@ -66,8 +66,8 @@ export function ReceiptTable({ receipts, accountId }: ReceiptTableProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "receipts"] });
-      // Also invalidate subscription status to update the receipt counter
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "subscription"] });
+      // Note: We do NOT invalidate subscription status here because the receipt counter
+      // tracks lifetime uploads, not current receipts (prevents abuse of upload/delete/re-upload)
       toast({
         title: "Receipt deleted",
         description: "The receipt has been removed successfully",
