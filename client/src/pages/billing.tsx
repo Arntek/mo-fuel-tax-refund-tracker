@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,13 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CreditCard, Calendar, Loader2, CheckCircle, AlertTriangle, ExternalLink, FileText, Receipt, Plus } from "lucide-react";
+import { Calendar, Loader2, CheckCircle, AlertTriangle, FileText, Receipt, Plus, CreditCard } from "lucide-react";
 import type { Account, FiscalYearPlan } from "@shared/schema";
 import { Helmet } from "react-helmet";
-
-// Pricing constants (match server)
-const RECEIPT_PACK_PRICE_CENTS = 500;
-const RECEIPT_PACK_SIZE = 52;
 
 type SubscriptionStatus = {
   status: "trial" | "active" | "expired" | "cancelled";
@@ -62,21 +58,29 @@ export default function Billing() {
     queryKey: ["/api/accounts", accountId],
   });
 
-  const currentFiscalYear = getCurrentFiscalYear();
-
-  const { data: subscriptionStatus, isLoading: statusLoading } = useQuery<SubscriptionStatus>({
-    queryKey: ["/api/accounts", accountId, "subscription", currentFiscalYear],
-    queryFn: async () => {
-      const response = await fetch(`/api/accounts/${accountId}/subscription?fiscalYear=${currentFiscalYear}`);
-      if (!response.ok) throw new Error("Failed to fetch subscription status");
-      return response.json();
-    },
+  const { data: plans = [], isLoading: plansLoading } = useQuery<FiscalYearPlan[]>({
+    queryKey: ["/api/billing/plans"],
     enabled: isAdminOrOwner,
   });
 
-  const { data: plans = [] } = useQuery<FiscalYearPlan[]>({
-    queryKey: ["/api/billing/plans"],
-    enabled: isAdminOrOwner,
+  // Fetch subscription status for each plan
+  const subscriptionQueries = useQueries({
+    queries: plans.map((plan) => ({
+      queryKey: ["/api/accounts", accountId, "subscription", plan.fiscalYear],
+      queryFn: async () => {
+        const response = await fetch(`/api/accounts/${accountId}/subscription?fiscalYear=${plan.fiscalYear}`);
+        if (!response.ok) throw new Error("Failed to fetch subscription status");
+        return response.json() as Promise<SubscriptionStatus>;
+      },
+      enabled: isAdminOrOwner && plans.length > 0,
+    })),
+  });
+
+  const subscriptionStatusMap = new Map<string, SubscriptionStatus>();
+  plans.forEach((plan, index) => {
+    if (subscriptionQueries[index]?.data) {
+      subscriptionStatusMap.set(plan.fiscalYear, subscriptionQueries[index].data!);
+    }
   });
 
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ payments: Payment[] }>({
@@ -86,8 +90,13 @@ export default function Billing() {
 
   const payments = paymentsData?.payments || [];
 
+  // Track loading state per fiscal year for subscribe and purchase actions
+  const [subscribingFiscalYear, setSubscribingFiscalYear] = useState<string | null>(null);
+  const [purchasingPackFiscalYear, setPurchasingPackFiscalYear] = useState<string | null>(null);
+
   const createCheckoutMutation = useMutation({
     mutationFn: async (fiscalYear: string) => {
+      setSubscribingFiscalYear(fiscalYear);
       const response = await apiRequest(`/api/accounts/${accountId}/checkout`, {
         method: "POST",
         body: JSON.stringify({
@@ -101,35 +110,20 @@ export default function Billing() {
     onSuccess: (data) => {
       if (data?.url) {
         window.location.href = data.url;
+      } else {
+        // No redirect URL returned - clear loading state
+        setSubscribingFiscalYear(null);
       }
     },
     onError: () => {
+      setSubscribingFiscalYear(null);
       toast({ title: "Error", description: "Failed to start checkout", variant: "destructive" });
-    },
-  });
-
-  const openBillingPortalMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest(`/api/accounts/${accountId}/billing-portal`, {
-        method: "POST",
-        body: JSON.stringify({
-          returnUrl: window.location.href,
-        }),
-      });
-      return response;
-    },
-    onSuccess: (data) => {
-      if (data?.url) {
-        window.location.href = data.url;
-      }
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to open billing portal", variant: "destructive" });
     },
   });
 
   const purchaseReceiptPackMutation = useMutation({
     mutationFn: async (fiscalYear: string) => {
+      setPurchasingPackFiscalYear(fiscalYear);
       const response = await apiRequest(`/api/accounts/${accountId}/purchase-receipt-pack`, {
         method: "POST",
         body: JSON.stringify({
@@ -143,15 +137,16 @@ export default function Billing() {
       if (data?.url) {
         window.location.href = data.url;
       } else {
+        // No redirect URL returned - clear loading state and refresh data
+        setPurchasingPackFiscalYear(null);
         queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "subscription"] });
       }
     },
     onError: () => {
+      setPurchasingPackFiscalYear(null);
       toast({ title: "Error", description: "Failed to start checkout for receipt pack", variant: "destructive" });
     },
   });
-
-  const currentPlan = plans.find((p) => p.fiscalYear === currentFiscalYear);
 
   if (roleLoading) {
     return (
@@ -164,9 +159,6 @@ export default function Billing() {
   if (!isAdminOrOwner) {
     return null;
   }
-  const receiptProgress = subscriptionStatus 
-    ? Math.min(100, (subscriptionStatus.receiptCount / subscriptionStatus.receiptLimit) * 100) 
-    : 0;
 
   return (
     <>
@@ -188,229 +180,48 @@ export default function Billing() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              {currentFiscalYear} Subscription Status
+              Fiscal Year Subscriptions
             </CardTitle>
             <CardDescription>
-              Your current subscription status for fiscal year {currentFiscalYear}
+              Subscribe to fiscal years to upload receipts for tax refund filing
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {statusLoading ? (
+            {plansLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : subscriptionStatus ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Status</p>
-                    <StatusBadge status={subscriptionStatus.status} />
-                  </div>
-                  {subscriptionStatus.status === "active" ? (
-                    <CheckCircle className="w-8 h-8 text-green-500" />
-                  ) : subscriptionStatus.upgradeRequired ? (
-                    <AlertTriangle className="w-8 h-8 text-amber-500" />
-                  ) : null}
-                </div>
-
-                {subscriptionStatus.status === "trial" && (
-                  <>
-                    <Separator />
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Trial Receipt Usage</span>
-                        <span className="font-medium">
-                          {subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit} receipts
-                        </span>
-                      </div>
-                      <Progress value={receiptProgress} className="h-2" />
-
-                      {subscriptionStatus.trialDaysRemaining !== null && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Trial Days Remaining</span>
-                          <span className="font-medium">
-                            {subscriptionStatus.trialDaysRemaining} days
-                          </span>
-                        </div>
-                      )}
-
-                      {subscriptionStatus.upgradeRequired && (
-                        <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                            <div className="space-y-1">
-                              <p className="font-medium text-amber-800 dark:text-amber-200">
-                                Trial Limit Reached
-                              </p>
-                              <p className="text-sm text-amber-700 dark:text-amber-300">
-                                {subscriptionStatus.receiptCount >= subscriptionStatus.receiptLimit
-                                  ? `You've uploaded ${subscriptionStatus.receiptLimit} receipts.`
-                                  : "Your 30-day trial has ended."}
-                                {" "}Subscribe to continue uploading receipts for this fiscal year.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {subscriptionStatus.status !== "active" && currentPlan && (
-                  <>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium">{currentPlan.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {currentPlan.baseReceiptLimit} receipt uploads for {currentFiscalYear}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Need more? Add {RECEIPT_PACK_SIZE} receipts for ${(RECEIPT_PACK_PRICE_CENTS / 100).toFixed(2)} each
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold">
-                          ${(currentPlan.priceInCents / 100).toFixed(2)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">one-time payment</p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => createCheckoutMutation.mutate(currentFiscalYear)}
-                      disabled={createCheckoutMutation.isPending}
-                      className="w-full gap-2"
-                      size="lg"
-                      data-testid="button-subscribe"
-                    >
-                      {createCheckoutMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <CreditCard className="w-4 h-4" />
-                          Subscribe Now
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )}
-
-                {subscriptionStatus.status === "active" && (
-                  <>
-                    <Separator />
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Receipt Usage</span>
-                        <span className="font-medium">
-                          {subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit} receipts
-                        </span>
-                      </div>
-                      <Progress value={receiptProgress} className="h-2" />
-                      
-                      {subscriptionStatus.needsMoreReceipts ? (
-                        <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                            <div className="flex-1 space-y-3">
-                              <div className="space-y-1">
-                                <p className="font-medium text-amber-800 dark:text-amber-200">
-                                  Receipt Limit Reached
-                                </p>
-                                <p className="text-sm text-amber-700 dark:text-amber-300">
-                                  You've used all {subscriptionStatus.receiptLimit} receipts. Purchase additional receipts to continue uploading.
-                                </p>
-                              </div>
-                              <Button
-                                onClick={() => purchaseReceiptPackMutation.mutate(currentFiscalYear)}
-                                disabled={purchaseReceiptPackMutation.isPending}
-                                className="gap-2"
-                                data-testid="button-buy-more-receipts"
-                              >
-                                {purchaseReceiptPackMutation.isPending ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Plus className="w-4 h-4" />
-                                    Add {RECEIPT_PACK_SIZE} Receipts (${(RECEIPT_PACK_PRICE_CENTS / 100).toFixed(2)})
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-                          <div className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
-                            <div className="flex-1 space-y-3">
-                              <div className="space-y-1">
-                                <p className="font-medium text-green-800 dark:text-green-200">
-                                  Subscription Active
-                                </p>
-                                <p className="text-sm text-green-700 dark:text-green-300">
-                                  You have {subscriptionStatus.receiptLimit - subscriptionStatus.receiptCount} receipts remaining for {currentFiscalYear}.
-                                </p>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => purchaseReceiptPackMutation.mutate(currentFiscalYear)}
-                                disabled={purchaseReceiptPackMutation.isPending}
-                                className="gap-2"
-                                data-testid="button-add-receipts"
-                              >
-                                {purchaseReceiptPackMutation.isPending ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Plus className="w-4 h-4" />
-                                    Add {RECEIPT_PACK_SIZE} Receipts (${(RECEIPT_PACK_PRICE_CENTS / 100).toFixed(2)})
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
+            ) : plans.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Unable to load subscription status. Please try again later.
+                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No fiscal year plans available yet</p>
+                <p className="text-sm mt-1">Please check back later</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {plans.filter(p => p.active).map((plan) => {
+                  const subscriptionStatus = subscriptionStatusMap.get(plan.fiscalYear);
+                  const isLoading = subscriptionQueries.find((q, i) => plans[i]?.fiscalYear === plan.fiscalYear)?.isLoading;
+                  const packSize = plan.packSize || 52;
+                  const packPrice = ((plan.packPriceInCents || 500) / 100).toFixed(2);
+
+                  return (
+                    <FiscalYearPlanCard
+                      key={plan.id}
+                      plan={plan}
+                      subscriptionStatus={subscriptionStatus}
+                      isLoading={isLoading}
+                      packSize={packSize}
+                      packPrice={packPrice}
+                      onSubscribe={() => createCheckoutMutation.mutate(plan.fiscalYear)}
+                      onPurchasePack={() => purchaseReceiptPackMutation.mutate(plan.fiscalYear)}
+                      isSubscribing={subscribingFiscalYear === plan.fiscalYear}
+                      isPurchasingPack={purchasingPackFiscalYear === plan.fiscalYear}
+                    />
+                  );
+                })}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Payment Methods
-            </CardTitle>
-            <CardDescription>
-              Update your payment method through our secure billing portal
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              onClick={() => openBillingPortalMutation.mutate()}
-              disabled={openBillingPortalMutation.isPending}
-              className="gap-2"
-              data-testid="button-billing-portal"
-            >
-              {openBillingPortalMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <ExternalLink className="w-4 h-4" />
-                  Update Payment Method
-                </>
-              )}
-            </Button>
           </CardContent>
         </Card>
 
@@ -485,8 +296,209 @@ export default function Billing() {
             )}
           </CardContent>
         </Card>
-    </main>
+      </main>
     </>
+  );
+}
+
+type FiscalYearPlanCardProps = {
+  plan: FiscalYearPlan;
+  subscriptionStatus: SubscriptionStatus | undefined;
+  isLoading: boolean | undefined;
+  packSize: number;
+  packPrice: string;
+  onSubscribe: () => void;
+  onPurchasePack: () => void;
+  isSubscribing: boolean;
+  isPurchasingPack: boolean;
+};
+
+function FiscalYearPlanCard({
+  plan,
+  subscriptionStatus,
+  isLoading,
+  packSize,
+  packPrice,
+  onSubscribe,
+  onPurchasePack,
+  isSubscribing,
+  isPurchasingPack,
+}: FiscalYearPlanCardProps) {
+  if (isLoading) {
+    return (
+      <div className="p-4 border rounded-lg">
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  const receiptProgress = subscriptionStatus
+    ? Math.min(100, (subscriptionStatus.receiptCount / subscriptionStatus.receiptLimit) * 100)
+    : 0;
+
+  return (
+    <div className="p-4 border rounded-lg space-y-4" data-testid={`plan-card-${plan.fiscalYear}`}>
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-lg">{plan.fiscalYear}</h3>
+            {subscriptionStatus && <StatusBadge status={subscriptionStatus.status} />}
+          </div>
+          <p className="text-sm text-muted-foreground">{plan.name}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xl font-bold">${(plan.priceInCents / 100).toFixed(2)}</p>
+          <p className="text-xs text-muted-foreground">{plan.baseReceiptLimit} receipts</p>
+        </div>
+      </div>
+
+      {subscriptionStatus?.status === "active" && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span>Receipt Usage</span>
+              <span className="font-medium">
+                {subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit} receipts
+              </span>
+            </div>
+            <Progress value={receiptProgress} className="h-2" />
+
+            {subscriptionStatus.needsMoreReceipts ? (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Receipt limit reached. Add more to continue uploading.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={onPurchasePack}
+                      disabled={isPurchasingPack}
+                      className="gap-1"
+                      data-testid={`button-buy-pack-${plan.fiscalYear}`}
+                    >
+                      {isPurchasingPack ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="w-3 h-3" />
+                          Add {packSize} Receipts (${packPrice})
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{subscriptionStatus.receiptLimit - subscriptionStatus.receiptCount} receipts remaining</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onPurchasePack}
+                  disabled={isPurchasingPack}
+                  className="gap-1"
+                  data-testid={`button-add-pack-${plan.fiscalYear}`}
+                >
+                  {isPurchasingPack ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-3 h-3" />
+                      Add {packSize} (${packPrice})
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {subscriptionStatus?.status === "trial" && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span>Trial Usage</span>
+              <span className="font-medium">
+                {subscriptionStatus.receiptCount} / {subscriptionStatus.receiptLimit} receipts
+              </span>
+            </div>
+            <Progress value={receiptProgress} className="h-2" />
+
+            {subscriptionStatus.trialDaysRemaining !== null && (
+              <p className="text-sm text-muted-foreground">
+                {subscriptionStatus.trialDaysRemaining} trial days remaining
+              </p>
+            )}
+
+            {subscriptionStatus.upgradeRequired && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    {subscriptionStatus.receiptCount >= subscriptionStatus.receiptLimit
+                      ? "Trial receipt limit reached."
+                      : "Trial period ended."}
+                    {" "}Subscribe to continue.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <Button
+              onClick={onSubscribe}
+              disabled={isSubscribing}
+              className="w-full gap-2"
+              data-testid={`button-subscribe-${plan.fiscalYear}`}
+            >
+              {isSubscribing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4" />
+                  Subscribe for ${(plan.priceInCents / 100).toFixed(2)}
+                </>
+              )}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {(!subscriptionStatus || subscriptionStatus.status === "expired" || subscriptionStatus.status === "cancelled") && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {plan.baseReceiptLimit} receipt uploads included. Need more? Add {packSize} receipts for ${packPrice}.
+            </p>
+            <Button
+              onClick={onSubscribe}
+              disabled={isSubscribing}
+              className="w-full gap-2"
+              data-testid={`button-subscribe-${plan.fiscalYear}`}
+            >
+              {isSubscribing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4" />
+                  Subscribe for ${(plan.priceInCents / 100).toFixed(2)}
+                </>
+              )}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -501,14 +513,4 @@ function StatusBadge({ status }: { status: SubscriptionStatus["status"] }) {
     case "cancelled":
       return <Badge variant="outline">Cancelled</Badge>;
   }
-}
-
-function getCurrentFiscalYear(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  if (month >= 6) {
-    return `${year}-${year + 1}`;
-  }
-  return `${year - 1}-${year}`;
 }
