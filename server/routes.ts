@@ -21,6 +21,14 @@ import * as stripeService from "./stripe";
 import express from "express";
 import rateLimit, { type Options, ipKeyGenerator } from "express-rate-limit";
 
+// Helper function for safe error responses in production (Item #14 security fix)
+function safeErrorMessage(error: unknown, defaultMessage: string): string {
+  if (process.env.NODE_ENV === "production") {
+    return defaultMessage;
+  }
+  return error instanceof Error ? error.message : defaultMessage;
+}
+
 // Rate limiting for authentication endpoints (Item #2 security fix)
 // Using ipKeyGenerator(req, res) to properly handle IPv6 addresses with /64 subnet normalization
 const authCodeRequestLimiter = rateLimit({
@@ -204,16 +212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Valid email required" });
       }
       
-      const existingUser = await storage.getUserByEmail(email);
-      
+      // Always send auth code (for both existing and new users) 
+      // but return same message to prevent user enumeration
       await createAuthCodeForEmail(email);
       
       res.json({ 
         success: true, 
-        userExists: !!existingUser,
-        message: existingUser 
-          ? "Login code sent to your email" 
-          : "This email is not registered. Please sign up first."
+        message: "If this email is registered, you will receive a login code."
       });
     } catch (error) {
       console.error("Error requesting auth code:", error);
@@ -600,8 +605,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.params.userId;
       const { role } = req.body;
       
-      if (!role) {
-        return res.status(400).json({ error: "Role required" });
+      // Validate role is one of allowed values (never "owner" - that's determined by account.ownerId)
+      const allowedRoles = ["member", "admin"];
+      if (!role || !allowedRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Allowed values: member, admin" });
+      }
+      
+      // Prevent changing the account owner's role
+      const account = await storage.getAccountById(req.accountId);
+      if (account?.ownerId === userId) {
+        return res.status(400).json({ error: "Cannot change account owner's role" });
       }
       
       const updated = await storage.updateMemberRole(req.accountId, userId, role);
@@ -1021,8 +1034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error uploading receipt:", error);
       res.status(500).json({ 
-        error: "Failed to process receipt",
-        message: error instanceof Error ? error.message : "Unknown error"
+        error: safeErrorMessage(error, "Failed to process receipt")
       });
     }
   });

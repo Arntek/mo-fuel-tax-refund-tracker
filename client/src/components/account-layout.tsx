@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, Upload, FileDown, Sun, Moon } from "lucide-react";
+import { LogOut, Users, Car, ChevronDown, Menu, Receipt, CreditCard, Upload, FileDown, Sun, Moon, Settings } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -127,6 +127,12 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
         url: accountId ? `/export/${accountId}` : "#",
         icon: FileDown,
         testId: "button-export",
+      },
+      {
+        title: "Settings",
+        url: accountId ? `/settings/${accountId}` : "#",
+        icon: Settings,
+        testId: "button-settings",
       },
     ] : []),
   ];
