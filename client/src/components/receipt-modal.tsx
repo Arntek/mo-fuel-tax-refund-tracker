@@ -296,12 +296,7 @@ export function ReceiptModal({ receipt, accountId, open, onClose }: ReceiptModal
               <p className="pt-2">
                 <span className="font-medium">Fiscal Year:</span> {receipt.fiscalYear}
               </p>
-              {receiptWithTax.taxRate !== undefined && (
-                <p data-testid="text-tax-rate">
-                  <span className="font-medium">Tax Rate:</span> ${parseFloat(receiptWithTax.taxRate.toString()).toFixed(3)}/gal
-                </p>
-              )}
-              {receiptWithTax.taxRefund !== undefined && (
+              {receiptWithTax.taxRefund !== undefined && !isNaN(receiptWithTax.taxRefund) && (
                 <p className="text-base font-semibold text-primary" data-testid="text-tax-refund">
                   <span className="font-medium text-muted-foreground">Tax Refund:</span> ${parseFloat(receiptWithTax.taxRefund.toString()).toFixed(2)}
                 </p>
