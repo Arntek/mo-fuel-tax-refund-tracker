@@ -105,6 +105,50 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-1 sm:gap-2" aria-label="Main navigation">
+          <Button variant="ghost" size="icon" data-testid="button-upload" aria-label="Upload" asChild>
+            <Link href={`/upload/${accountId}`}>
+              <Upload className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" data-testid="button-receipts" aria-label="Receipts" asChild>
+            <Link href={`/receipts/${accountId}`}>
+              <Receipt className="w-4 h-4" />
+            </Link>
+          </Button>
+          {isAdminOrOwner && (
+            <Button variant="ghost" size="icon" data-testid="button-people" aria-label="People" asChild>
+              <Link href={`/people/${accountId}`}>
+                <Users className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" data-testid="button-vehicles" aria-label="Vehicles" asChild>
+            <Link href={`/vehicles/${accountId}`}>
+              <Car className="w-4 h-4" />
+            </Link>
+          </Button>
+          {isAdminOrOwner && (
+            <Button variant="ghost" size="icon" data-testid="button-settings" aria-label="Settings" asChild>
+              <Link href={`/settings/${accountId}`}>
+                <Settings className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
+          {isAdminOrOwner && (
+            <Button variant="ghost" size="icon" data-testid="button-billing" aria-label="Billing" asChild>
+              <Link href={`/billing/${accountId}`}>
+                <CreditCard className="w-4 h-4" />
+              </Link>
+            </Button>
+          )}
+          <ThemeToggle />
+          <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout" aria-label="Logout">
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </nav>
+        
         {/* Mobile Navigation */}
         <div className="md:hidden flex items-center gap-2">
           <ThemeToggle />
@@ -122,6 +166,54 @@ export function AccountHeader({ account, accountId }: AccountHeaderProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-64">
+              <nav id="mobile-nav" className="flex flex-col gap-4 mt-8" aria-label="Mobile navigation">
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-upload" asChild>
+                  <Link href={`/upload/${accountId}`} onClick={closeMenu}>
+                    <Upload className="w-5 h-5" />
+                    <span>Upload</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-receipts" asChild>
+                  <Link href={`/receipts/${accountId}`} onClick={closeMenu}>
+                    <Receipt className="w-5 h-5" />
+                    <span>Receipts</span>
+                  </Link>
+                </Button>
+                {isAdminOrOwner && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-people" asChild>
+                    <Link href={`/people/${accountId}`} onClick={closeMenu}>
+                      <Users className="w-5 h-5" />
+                      <span>People</span>
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-vehicles" asChild>
+                  <Link href={`/vehicles/${accountId}`} onClick={closeMenu}>
+                    <Car className="w-5 h-5" />
+                    <span>Vehicles</span>
+                  </Link>
+                </Button>
+                {isAdminOrOwner && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-settings" asChild>
+                    <Link href={`/settings/${accountId}`} onClick={closeMenu}>
+                      <Settings className="w-5 h-5" />
+                      <span>Settings</span>
+                    </Link>
+                  </Button>
+                )}
+                {isAdminOrOwner && (
+                  <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-button-billing" asChild>
+                    <Link href={`/billing/${accountId}`} onClick={closeMenu}>
+                      <CreditCard className="w-5 h-5" />
+                      <span>Billing</span>
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => { closeMenu(); handleLogout(); }} data-testid="mobile-button-logout">
+                  <LogOut className="w-5 h-5" />
+                  <span>Logout</span>
+                </Button>
+              </nav>
             </SheetContent>
           </Sheet>
         </div>

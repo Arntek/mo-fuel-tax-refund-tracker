@@ -88,6 +88,48 @@ export function AccountLayout({ accountId, children, settingsContent }: AccountL
     );
   }
 
+  const menuItems = [
+    {
+      title: "Upload",
+      url: accountId ? `/upload/${accountId}` : "#",
+      icon: Upload,
+      testId: "button-upload",
+    },
+    {
+      title: "Receipts",
+      url: accountId ? `/receipts/${accountId}` : "#",
+      icon: Receipt,
+      testId: "button-receipts",
+    },
+    ...(isAdminOrOwner ? [
+      {
+        title: "People",
+        url: accountId ? `/people/${accountId}` : "#",
+        icon: Users,
+        testId: "button-people",
+      },
+    ] : []),
+    {
+      title: "Vehicles",
+      url: accountId ? `/vehicles/${accountId}` : "#",
+      icon: Car,
+      testId: "button-vehicles",
+    },
+    ...(isAdminOrOwner ? [
+      {
+        title: "Billing",
+        url: accountId ? `/billing/${accountId}` : "#",
+        icon: CreditCard,
+        testId: "button-billing",
+      },
+      {
+        title: "Export Data",
+        url: accountId ? `/export/${accountId}` : "#",
+        icon: FileDown,
+        testId: "button-export",
+      },
+    ] : []),
+  ];
 
   const sidebarStyle = {
     "--sidebar-width": "16rem",
