@@ -226,6 +226,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary signup tokens - maps token to {email, expiresAt}
+  const signupTokens = new Map<string, { email: string; expiresAt: Date }>();
+  
   app.post("/api/auth/verify-code", authCodeVerifyLimiter, async (req, res) => {
     try {
       const { email, code } = req.body;
@@ -242,10 +245,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.getUserByEmail(email);
       
-      // If user doesn't exist, return success but indicate they need to sign up
+      // If user doesn't exist, create a temporary signup token
       // This is safe to reveal AFTER they've proven email ownership via code
       if (!user) {
-        return res.json({ success: true, userExists: false });
+        const signupToken = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        signupTokens.set(signupToken, { email, expiresAt });
+        return res.json({ success: true, userExists: false, signupToken });
       }
       
       const sessionId = await createSession(user.id);
@@ -267,17 +273,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/signup", signupLimiter, async (req, res) => {
     try {
-      const { email, firstName, lastName, code } = req.body;
+      const { signupToken, firstName, lastName } = req.body;
       
-      if (!email || !firstName || !lastName || !code) {
-        return res.status(400).json({ error: "Email, first name, last name, and code required" });
+      if (!signupToken || !firstName || !lastName) {
+        return res.status(400).json({ error: "Signup token, first name, and last name required" });
       }
       
-      const isValid = await verifyAuthCode(email, code);
-      
-      if (!isValid) {
-        return res.status(401).json({ error: "Invalid or expired code" });
+      // Validate signup token
+      const tokenData = signupTokens.get(signupToken);
+      if (!tokenData) {
+        return res.status(401).json({ error: "Invalid or expired signup token. Please start over." });
       }
+      
+      // Check expiration
+      if (new Date() > tokenData.expiresAt) {
+        signupTokens.delete(signupToken);
+        return res.status(401).json({ error: "Signup token expired. Please start over." });
+      }
+      
+      const email = tokenData.email;
+      
+      // Consume the token
+      signupTokens.delete(signupToken);
       
       const existingUser = await storage.getUserByEmail(email);
       

@@ -19,7 +19,7 @@ export default function Auth() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [codeValidated, setCodeValidated] = useState(false);
+  const [signupToken, setSignupToken] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const response = await apiRequest<{ success: boolean; userExists: boolean; user?: any }>("/api/auth/verify-code", {
+      const response = await apiRequest<{ success: boolean; userExists: boolean; user?: any; signupToken?: string }>("/api/auth/verify-code", {
         method: "POST",
         body: JSON.stringify({ email, code }),
       });
@@ -78,8 +78,10 @@ export default function Auth() {
         });
         setLocation("/accounts");
       } else {
-        // Code is valid but user doesn't exist - show signup form
-        setCodeValidated(true);
+        // Code is valid but user doesn't exist - save signup token and show name form
+        if (response.signupToken) {
+          setSignupToken(response.signupToken);
+        }
         setStep("signup");
         toast({
           title: "Almost there!",
@@ -105,10 +107,9 @@ export default function Auth() {
       await apiRequest("/api/auth/signup", {
         method: "POST",
         body: JSON.stringify({
-          email,
+          signupToken,
           firstName,
           lastName,
-          code,
         }),
       });
 
