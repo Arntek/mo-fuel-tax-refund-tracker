@@ -63,7 +63,10 @@ export async function createFiscalYearPlan(
   fiscalYear: string,
   name: string,
   description: string,
-  priceInCents: number
+  priceInCents: number,
+  baseReceiptLimit: number = BASE_RECEIPT_LIMIT,
+  packPriceInCents: number = RECEIPT_PACK_PRICE_CENTS,
+  packSize: number = RECEIPT_PACK_SIZE
 ): Promise<{ productId: string; priceId: string }> {
   const product = await requireStripe().products.create({
     name,
@@ -83,6 +86,9 @@ export async function createFiscalYearPlan(
     name,
     description,
     priceInCents,
+    baseReceiptLimit,
+    packPriceInCents,
+    packSize,
     stripeProductId: product.id,
     stripePriceId: price.id,
     active: true,
@@ -93,7 +99,7 @@ export async function createFiscalYearPlan(
 
 export async function updateFiscalYearPlan(
   id: string,
-  updates: { name?: string; description?: string; priceInCents?: number; active?: boolean }
+  updates: { name?: string; description?: string; priceInCents?: number; active?: boolean; baseReceiptLimit?: number; packPriceInCents?: number; packSize?: number }
 ): Promise<void> {
   const [plan] = await db.select().from(fiscalYearPlans).where(eq(fiscalYearPlans.id, id));
   
@@ -207,8 +213,15 @@ export async function createReceiptPackCheckoutSession(
   packCount: number = 1
 ): Promise<string> {
   const customerId = await getOrCreateStripeCustomer(userId);
-  const totalReceiptsAdded = packCount * RECEIPT_PACK_SIZE;
-  const totalPrice = packCount * RECEIPT_PACK_PRICE_CENTS;
+  
+  // Get pack pricing from the fiscal year plan (with fallback to defaults)
+  const [plan] = await db.select().from(fiscalYearPlans)
+    .where(eq(fiscalYearPlans.fiscalYear, fiscalYear));
+  const packSize = plan?.packSize || RECEIPT_PACK_SIZE;
+  const packPriceInCents = plan?.packPriceInCents || RECEIPT_PACK_PRICE_CENTS;
+  
+  const totalReceiptsAdded = packCount * packSize;
+  const totalPrice = packCount * packPriceInCents;
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: customerId,

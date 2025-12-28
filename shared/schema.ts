@@ -142,6 +142,8 @@ export const fiscalYearPlans = pgTable("fiscal_year_plans", {
   description: text("description"),
   priceInCents: integer("price_in_cents").notNull().default(1200),
   baseReceiptLimit: integer("base_receipt_limit").notNull().default(156),
+  packPriceInCents: integer("pack_price_in_cents").notNull().default(500),
+  packSize: integer("pack_size").notNull().default(52),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   active: boolean("active").notNull().default(true),

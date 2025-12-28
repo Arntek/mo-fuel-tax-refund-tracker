@@ -35,7 +35,9 @@ import {
   AlertTriangle,
   ChevronRight,
   X,
-  ExternalLink
+  ExternalLink,
+  Pencil,
+  Save
 } from "lucide-react";
 import type { User, FiscalYearPlan } from "@shared/schema";
 import { format } from "date-fns";
@@ -106,6 +108,9 @@ export default function Admin() {
     name: "",
     description: "",
     priceInCents: 1200,
+    baseReceiptLimit: 156,
+    packPriceInCents: 500,
+    packSize: 52,
   });
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,6 +128,13 @@ export default function Admin() {
     maxRedemptions: "",
     fiscalYear: "",
   });
+  
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editingPlanData, setEditingPlanData] = useState<{
+    baseReceiptLimit: number;
+    packPriceInCents: number;
+    packSize: number;
+  } | null>(null);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -197,10 +209,28 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/plans"] });
       toast({ title: "Plan created", description: "Fiscal year plan created successfully" });
-      setNewPlan({ fiscalYear: "", name: "", description: "", priceInCents: 1200 });
+      setNewPlan({ fiscalYear: "", name: "", description: "", priceInCents: 1200, baseReceiptLimit: 156, packPriceInCents: 500, packSize: 52 });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create plan", variant: "destructive" });
+    },
+  });
+  
+  const updatePlanMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<typeof editingPlanData> }) => {
+      return apiRequest(`/api/admin/plans/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plans"] });
+      toast({ title: "Plan updated", description: "Plan settings saved successfully" });
+      setEditingPlanId(null);
+      setEditingPlanData(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update plan", variant: "destructive" });
     },
   });
 
@@ -887,50 +917,84 @@ export default function Admin() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleCreatePlan} className="grid gap-4 md:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fiscalYear">Fiscal Year</Label>
-                    <Input
-                      id="fiscalYear"
-                      placeholder="2024-2025"
-                      value={newPlan.fiscalYear}
-                      onChange={(e) => setNewPlan({ ...newPlan, fiscalYear: e.target.value })}
-                      data-testid="input-fiscal-year"
-                    />
+                <form onSubmit={handleCreatePlan} className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fiscalYear">Fiscal Year</Label>
+                      <Input
+                        id="fiscalYear"
+                        placeholder="2024-2025"
+                        value={newPlan.fiscalYear}
+                        onChange={(e) => setNewPlan({ ...newPlan, fiscalYear: e.target.value })}
+                        data-testid="input-fiscal-year"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="planName">Plan Name</Label>
+                      <Input
+                        id="planName"
+                        placeholder="FY 2024-2025 Subscription"
+                        value={newPlan.name}
+                        onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
+                        data-testid="input-plan-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Base Price (cents)</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        value={newPlan.priceInCents}
+                        onChange={(e) => setNewPlan({ ...newPlan, priceInCents: parseInt(e.target.value) || 1200 })}
+                        data-testid="input-price"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="baseReceiptLimit">Base Receipt Limit</Label>
+                      <Input
+                        id="baseReceiptLimit"
+                        type="number"
+                        value={newPlan.baseReceiptLimit}
+                        onChange={(e) => setNewPlan({ ...newPlan, baseReceiptLimit: parseInt(e.target.value) || 156 })}
+                        data-testid="input-base-receipt-limit"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="planName">Plan Name</Label>
-                    <Input
-                      id="planName"
-                      placeholder="FY 2024-2025 Subscription"
-                      value={newPlan.name}
-                      onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
-                      data-testid="input-plan-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price (cents)</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      value={newPlan.priceInCents}
-                      onChange={(e) => setNewPlan({ ...newPlan, priceInCents: parseInt(e.target.value) || 1200 })}
-                      data-testid="input-price"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button
-                      type="submit"
-                      disabled={createPlanMutation.isPending}
-                      className="w-full"
-                      data-testid="button-create-plan"
-                    >
-                      {createPlanMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        "Create Plan"
-                      )}
-                    </Button>
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="packPriceInCents">Add-On Pack Price (cents)</Label>
+                      <Input
+                        id="packPriceInCents"
+                        type="number"
+                        value={newPlan.packPriceInCents}
+                        onChange={(e) => setNewPlan({ ...newPlan, packPriceInCents: parseInt(e.target.value) || 500 })}
+                        data-testid="input-pack-price"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="packSize">Add-On Pack Size (receipts)</Label>
+                      <Input
+                        id="packSize"
+                        type="number"
+                        value={newPlan.packSize}
+                        onChange={(e) => setNewPlan({ ...newPlan, packSize: parseInt(e.target.value) || 52 })}
+                        data-testid="input-pack-size"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex items-end">
+                      <Button
+                        type="submit"
+                        disabled={createPlanMutation.isPending}
+                        className="w-full"
+                        data-testid="button-create-plan"
+                      >
+                        {createPlanMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Create Plan"
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </form>
               </CardContent>
@@ -958,8 +1022,12 @@ export default function Admin() {
                       <TableRow>
                         <TableHead>Fiscal Year</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead>Price</TableHead>
+                        <TableHead>Base Price</TableHead>
+                        <TableHead>Receipt Limit</TableHead>
+                        <TableHead>Pack Price</TableHead>
+                        <TableHead>Pack Size</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -969,9 +1037,100 @@ export default function Admin() {
                           <TableCell>{plan.name}</TableCell>
                           <TableCell>${(plan.priceInCents / 100).toFixed(2)}</TableCell>
                           <TableCell>
+                            {editingPlanId === plan.id ? (
+                              <Input
+                                type="number"
+                                value={editingPlanData?.baseReceiptLimit || 156}
+                                onChange={(e) => setEditingPlanData({ ...editingPlanData!, baseReceiptLimit: parseInt(e.target.value) || 156 })}
+                                className="w-20 h-8"
+                                data-testid={`input-edit-receipt-limit-${plan.id}`}
+                              />
+                            ) : (
+                              plan.baseReceiptLimit || 156
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingPlanId === plan.id ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground text-xs">¢</span>
+                                <Input
+                                  type="number"
+                                  value={editingPlanData?.packPriceInCents || 500}
+                                  onChange={(e) => setEditingPlanData({ ...editingPlanData!, packPriceInCents: parseInt(e.target.value) || 500 })}
+                                  className="w-20 h-8"
+                                  data-testid={`input-edit-pack-price-${plan.id}`}
+                                />
+                              </div>
+                            ) : (
+                              `$${((plan.packPriceInCents || 500) / 100).toFixed(2)}`
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingPlanId === plan.id ? (
+                              <Input
+                                type="number"
+                                value={editingPlanData?.packSize || 52}
+                                onChange={(e) => setEditingPlanData({ ...editingPlanData!, packSize: parseInt(e.target.value) || 52 })}
+                                className="w-20 h-8"
+                                data-testid={`input-edit-pack-size-${plan.id}`}
+                              />
+                            ) : (
+                              plan.packSize || 52
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <Badge variant={plan.active ? "default" : "secondary"}>
                               {plan.active ? "Active" : "Inactive"}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {editingPlanId === plan.id ? (
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingPlanId(null);
+                                    setEditingPlanData(null);
+                                  }}
+                                  data-testid={`button-cancel-edit-${plan.id}`}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    if (editingPlanData) {
+                                      updatePlanMutation.mutate({ id: plan.id, updates: editingPlanData });
+                                    }
+                                  }}
+                                  disabled={updatePlanMutation.isPending}
+                                  data-testid={`button-save-edit-${plan.id}`}
+                                >
+                                  {updatePlanMutation.isPending ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Save className="w-3 h-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingPlanId(plan.id);
+                                  setEditingPlanData({
+                                    baseReceiptLimit: plan.baseReceiptLimit || 156,
+                                    packPriceInCents: plan.packPriceInCents || 500,
+                                    packSize: plan.packSize || 52,
+                                  });
+                                }}
+                                data-testid={`button-edit-plan-${plan.id}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

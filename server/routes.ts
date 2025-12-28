@@ -1103,7 +1103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { fiscalYear, name, description, priceInCents } = req.body;
+      const { fiscalYear, name, description, priceInCents, baseReceiptLimit, packPriceInCents, packSize } = req.body;
       
       if (!fiscalYear || !name) {
         return res.status(400).json({ error: "Fiscal year and name required" });
@@ -1113,7 +1113,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fiscalYear,
         name,
         description || `Subscription for fiscal year ${fiscalYear}`,
-        priceInCents || 1200
+        priceInCents || 1200,
+        baseReceiptLimit || 156,
+        packPriceInCents || 500,
+        packSize || 52
       );
 
       res.json({ success: true, ...result });
